@@ -56,7 +56,7 @@ class Model(nn.Module):
 
     def policy(self, inputs, states):
         """
-        Return: action_dists: a dict of action distribution objects
+        Return: action_dicts: a dict of action distribution objects
                 states
                 An action distribution object can be created with
                 PolicyDistribution().
@@ -98,13 +98,13 @@ class Algorithm(object):
 
     def get_action_specs(self):
         """
-        For non-RL algortihms, this can return []
+        For non-RL algorithms, this can return []
         """
         return self.model.get_action_specs()
 
     def get_reward_specs(self):
         """
-        For non-RL algortihms, this can return []
+        For non-RL algorithms, this can return []
         """
         return self.model.get_reward_specs()
 
