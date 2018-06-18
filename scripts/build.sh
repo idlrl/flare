@@ -29,9 +29,10 @@ function check_style() {
     trap 'abort' 0
     set -e
 
+    pip install pre-commit
+
     export PATH=/usr/bin:$PATH
     pre-commit install
-    clang-format --version
 
     if ! pre-commit run -a ; then
         git diff

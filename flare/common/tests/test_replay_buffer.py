@@ -1,7 +1,7 @@
 import numpy as np
 import unittest
-from parl.common.error_handling import LastExpError
-from parl.common.replay_buffer import Experience, Sample, ReplayBuffer
+from flare.common.error_handling import LastExpError
+from flare.common.replay_buffer import Experience, Sample, ReplayBuffer
 
 
 class ExperienceForTest(Experience):

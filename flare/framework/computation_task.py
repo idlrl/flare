@@ -52,7 +52,6 @@ class ComputationTask(object):
                 "%s %s" % (tuple(np_array.shape[1:]), tuple(props["shape"]))
 
             tensors[name] = torch.from_numpy(np_array)
-            tensors[name].requires_grad_()
             tensors[name].to(self.device)
 
         return tensors
