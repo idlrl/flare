@@ -52,7 +52,7 @@ class TestGymGame(unittest.TestCase):
                         model=SimpleModelAC(
                             dims=state_shape, num_actions=num_actions,
                             mlp=mlp),
-                        hyperparas=dict(lr=1e-3))
+                        hyperparas=dict(lr=1e-4))
                 else:
                     alg = SimpleQ(
                         model=SimpleModelQ(

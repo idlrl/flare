@@ -44,7 +44,7 @@ def idx_select(input, idx):
 def one_hot(idx, depth):
     ### idx will be just one-dimensional
     ### the embedded vectors will be two-dimensional
-    emb = nn.Embedding(depth, depth)
-    emb.weight.data = torch.eye(depth)
-    emb.weight.requires_grad = False  ## do not change the 'eye' matrix
-    return emb(idx)
+    ones = torch.eye(depth)
+    if idx.is_cuda:
+        ones = ones.to(idx.get_device())
+    return ones.index_select(0, idx.long())

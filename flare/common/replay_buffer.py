@@ -1,6 +1,6 @@
 import copy
 import random
-from parl.common.error_handling import *
+from flare.common.error_handling import *
 
 
 class Experience(object):
