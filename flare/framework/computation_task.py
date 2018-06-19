@@ -37,7 +37,7 @@ class ComputationTask(object):
         self.alg.model.to(self.device)
 
     def _create_tensors(self, np_arrays_dict, specs):
-        ## We want to convert numpy arrayes to torch tensors,
+        ## We want to convert numpy arrays to torch tensors,
         ## and put them on the device
         tensors = {}
         for name, props in specs:
@@ -65,8 +65,8 @@ class ComputationTask(object):
     def predict(self, inputs, states=dict()):
         """
         ComputationTask predict API
-        This function is responsible to convert Python data to Fluid tensors, and
-        then convert the computational results in the reverse way.
+        This function is responsible to convert Python numpy arrays to pytorch
+        tensors, and then convert the computational results in the reverse way.
         """
         inputs = self._create_tensors(inputs, self.alg.get_input_specs())
         states = self._create_tensors(states, self.alg.get_state_specs())
@@ -93,8 +93,8 @@ class ComputationTask(object):
               next_states=dict()):
         """
         ComputationTask learn API
-        This function is responsible to convert Python data to Fluid tensors, and
-        then convert the computational results in the reverse way.
+        This function is responsible to convert Python numpy arrays to pytorch
+        tensors, and then convert the computational results in the reverse way.
         """
 
         def _get_next_specs(specs):
