@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from flare.framework.algorithm import Model, Algorithm
+from flare.framework.computation_wrapper import ComputationWrapper
 
 
 def split_list(l, sizes):
@@ -26,8 +27,9 @@ class ComputationTask(object):
     c. define a ComputationTask with the algorithm
     """
 
-    def __init__(self, algorithm):
+    def __init__(self, name, algorithm, **kwargs):
         assert isinstance(algorithm, Algorithm)
+        self.name = name
         self.alg = algorithm
         if torch.cuda.is_available() and self.alg.gpu_id >= 0:
             self.device = torch.device("cuda:" + str(self.alg.gpu_id))
@@ -35,6 +37,15 @@ class ComputationTask(object):
             self.device = torch.device("cpu")
         ## put the model on the device
         self.alg.model.to(self.device)
+        self._wrapper_args = kwargs
+        self._wrapper = None
+
+    @property
+    def wrapper(self):
+        if self._wrapper is None:
+            self._wrapper = ComputationWrapper(self.name, self,
+                                               **self._wrapper_args)
+        return self._wrapper
 
     def _create_tensors(self, np_arrays_dict, specs):
         ## We want to convert numpy arrays to torch tensors,
