@@ -6,7 +6,7 @@ def make_hierarchy_of_tensors(data, dtype, device, shape):
     """
     Given a (nested) list of arrays (`data`), each with a `shape`,
     return a (nested) list of torch tensors such that only the leaf nodes that
-    all should matche `shape` will be converted. The other intermediate nodes
+    all should match `shape` will be converted. The other intermediate nodes
     keep the same (still list).
     """
     assert hasattr(data, "__len__"), "no leaf with the shape is found!"
@@ -68,7 +68,7 @@ def transpose(hier_tensors):
 def recurrent_group(seq_inputs, insts, init_states, step_func):
     """
     Strip a sequence level and apply the stripped inputs to `step_func`
-    provided the user.
+    provided by the user.
 
     seq_inputs: collection of sequences, each being either a tensor or a list
     insts: collection of static instances, each being a tensor
@@ -77,6 +77,9 @@ def recurrent_group(seq_inputs, insts, init_states, step_func):
     assert isinstance(seq_inputs, list)
     assert isinstance(insts, list)
     assert isinstance(init_states, list)
+    for ipt in seq_inputs:
+        assert isinstance(ipt, list), \
+            "Each sequential input should be a collection (batch) of sequences!"
 
     ## We might have multiple sequential inputs.
     ## (For example,
@@ -85,7 +88,6 @@ def recurrent_group(seq_inputs, insts, init_states, step_func):
     ##   each sentence is paired with an image.)
     ## In this scenario, after the transpose the numbers of frames should be
     ## the same.
-
     ## If two sequential inputs cannot satisfy this requirement, then consider separating
     ## them by calling recurrent_group individually, because there cannot be any interaction
     ## between them at every time step.
@@ -113,8 +115,16 @@ def recurrent_group(seq_inputs, insts, init_states, step_func):
         assert len(seq_inputs[0]) == init_state.size()[0], \
             "The number of initial states should be the same with the number of sequences!"
 
+    ## we need to sort the sequential inputs by the seq lengths
+    seq_lens = [(i, batch_size(seq)) for i, seq in enumerate(seq_inputs[0])]
+    seq_lens = sorted(seq_lens, key=lambda p: p[1], reverse=True)
+    sorted_idx = list(zip(*seq_lens)[0])
+    seq_inputs = [[ipt[i] for i in sorted_idx] for ipt in seq_inputs]
+    insts = [inst[sorted_idx] for inst in insts]
+    init_states = [init_state[sorted_idx] for init_state in init_states]
+
     ## call the step function frame by frame
-    frames_n = max(map(batch_size, seq_inputs[0]))
+    frames_n = seq_lens[0][1]
     seq_frames = []
     for seq in seq_inputs:
         seq_frames.append(transpose(seq))
@@ -134,6 +144,7 @@ def recurrent_group(seq_inputs, insts, init_states, step_func):
         ## we should cut the insts and states by the frame_size
         states = [s[:frame_size] for s in states]
         insts = [i[:frame_size] for i in insts]
+        #        print(states)
         out_frames, states = step_func(*(in_frames + insts + states))
         out_frames += states
         transposed_out_frames.append(out_frames)
@@ -141,4 +152,8 @@ def recurrent_group(seq_inputs, insts, init_states, step_func):
     seq_outs = [
         transpose(list(frames)) for frames in zip(*transposed_out_frames)
     ]
+    ## we have to recover the order of sequences using `sorted_idx`
+    reverse_idx = zip(*sorted(
+        list(enumerate(sorted_idx)), key=lambda p: p[1]))[0]
+    seq_outs = [[out[i] for i in reverse_idx] for out in seq_outs]
     return seq_outs
