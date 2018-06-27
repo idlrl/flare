@@ -46,10 +46,7 @@ def transpose(hier_tensors):
 
     ## we require that the children at each level are sorted in the
     ## descending order of their lengths
-    seq_lens = []
-    for node in hier_tensors:
-        seq_lens.append(batch_size(node))
-
+    seq_lens = [batch_size(node) for node in hier_tensors]
     assert seq_lens == sorted(seq_lens, reverse=True), \
         "please sort the sequences in the descending order of sequence lengths!"
 
@@ -100,7 +97,7 @@ def recurrent_group(seq_inputs, insts, init_states, step_func):
     def check_sequences_aligned(seq_inputs):
         len_mat = [map(batch_size, si) for si in seq_inputs]
         trans_len_mat = zip(*len_mat)
-        assert (not (False in [len(set(r)) == 1 for r in trans_len_mat])), \
+        assert all([len(set(r)) == 1 for r in trans_len_mat]), \
             "Some sequences are not temporally aligned!"
 
     check_num_sequences_equal(seq_inputs)
@@ -118,7 +115,7 @@ def recurrent_group(seq_inputs, insts, init_states, step_func):
     ## we need to sort the sequential inputs by the seq lengths
     seq_lens = [(i, batch_size(seq)) for i, seq in enumerate(seq_inputs[0])]
     seq_lens = sorted(seq_lens, key=lambda p: p[1], reverse=True)
-    sorted_idx = list(zip(*seq_lens)[0])
+    sorted_idx = [l[0] for l in seq_lens]
     seq_inputs = [[ipt[i] for i in sorted_idx] for ipt in seq_inputs]
     insts = [inst[sorted_idx] for inst in insts]
     init_states = [init_state[sorted_idx] for init_state in init_states]
@@ -144,16 +141,17 @@ def recurrent_group(seq_inputs, insts, init_states, step_func):
         ## we should cut the insts and states by the frame_size
         states = [s[:frame_size] for s in states]
         insts = [i[:frame_size] for i in insts]
-        #        print(states)
         out_frames, states = step_func(*(in_frames + insts + states))
-        out_frames += states
+        #        out_frames += states
         transposed_out_frames.append(out_frames)
 
     seq_outs = [
         transpose(list(frames)) for frames in zip(*transposed_out_frames)
     ]
+
     ## we have to recover the order of sequences using `sorted_idx`
     reverse_idx = zip(*sorted(
         list(enumerate(sorted_idx)), key=lambda p: p[1]))[0]
     seq_outs = [[out[i] for i in reverse_idx] for out in seq_outs]
+
     return seq_outs

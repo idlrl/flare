@@ -165,19 +165,17 @@ class TestComputationTask(unittest.TestCase):
 
         for on_policy in [True, False]:
             if on_policy:
-                alg = SimpleAC(
-                    model=SimpleModelAC(
-                        dims=dims,
-                        num_actions=num_actions,
-                        mlp=nn.Sequential(
-                            nn.Linear(
-                                dims, 64, bias=False),
-                            nn.ReLU(),
-                            nn.Linear(
-                                64, 32, bias=False),
-                            nn.ReLU())),
-                    hyperparas=dict(lr=1e-1))
-                ct = ComputationTask(algorithm=alg)
+                alg = SimpleAC(model=SimpleModelAC(
+                    dims=dims,
+                    num_actions=num_actions,
+                    mlp=nn.Sequential(
+                        nn.Linear(
+                            dims, 64, bias=False),
+                        nn.ReLU(),
+                        nn.Linear(
+                            64, 32, bias=False),
+                        nn.ReLU())))
+                ct = ComputationTask(algorithm=alg, hyperparas=dict(lr=1e-1))
             else:
                 alg = SimpleQ(
                     model=SimpleModelQ(
@@ -192,9 +190,8 @@ class TestComputationTask(unittest.TestCase):
                             nn.ReLU(),
                             nn.Linear(
                                 32, num_actions, bias=False))),
-                    update_ref_interval=100,
-                    hyperparas=dict(lr=1e-1))
-                ct = ComputationTask(algorithm=alg)
+                    update_ref_interval=100)
+                ct = ComputationTask(algorithm=alg, hyperparas=dict(lr=1e-1))
 
             for i in range(1000):
                 if on_policy:

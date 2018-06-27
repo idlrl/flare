@@ -1,6 +1,6 @@
 from flare.framework.algorithm import Model
-from flare.common.distributions import Deterministic
-from flare.common import common_functions as comf
+from flare.framework.distributions import Deterministic
+from flare.framework import common_functions as comf
 import torch.nn as nn
 from torch.distributions import Categorical
 
@@ -43,7 +43,7 @@ class SimpleModelAC(Model):
         return dict(action=dist), states
 
     def value(self, inputs, states):
-        return dict(v_value=self.value_net(inputs.values()[0]))
+        return dict(v_value=self.value_net(inputs.values()[0])), states
 
 
 class SimpleModelQ(Model):
@@ -60,9 +60,44 @@ class SimpleModelQ(Model):
         return [("action", dict(shape=[1], dtype="int64"))]
 
     def policy(self, inputs, states):
-        values = self.value(inputs, states)
+        values, states = self.value(inputs, states)
         q_value = values["q_value"]
         return dict(action=comf.q_categorical(q_value)), states
 
     def value(self, inputs, states):
-        return dict(q_value=self.mlp(inputs.values()[0]))
+        return dict(q_value=self.mlp(inputs.values()[0])), states
+
+
+class SimpleRNNModelQ(Model):
+    def __init__(self, dims, num_actions, mlp):
+        super(SimpleRNNModelQ, self).__init__()
+        self.dims = dims
+        self.num_actions = num_actions
+        self.hidden_layers = mlp
+        self.hidden_size = list(mlp.children())[-2].out_features
+        self.value_layer = nn.Linear(self.hidden_size, num_actions)
+        self.recurrent = nn.RNNCell(
+            input_size=self.hidden_size,
+            hidden_size=self.hidden_size,
+            nonlinearity="relu")
+
+    def get_input_specs(self):
+        return [("sensor", dict(shape=[self.dims]))]
+
+    def get_action_specs(self):
+        return [("action", dict(shape=[1], dtype="int64"))]
+
+    def get_state_specs(self):
+        return [("state", dict(shape=[self.hidden_size]))]
+
+    def policy(self, inputs, states):
+        values, next_states = self.value(inputs, states)
+        q_value = values["q_value"]
+        return dict(action=comf.q_categorical(q_value)), next_states
+
+    def value(self, inputs, states):
+        hidden = self.hidden_layers(inputs.values()[0])
+        next_state = self.recurrent(hidden, states.values()[0])
+        #        next_state = hidden
+        return dict(q_value=self.value_layer(next_state)), dict(
+            state=next_state)

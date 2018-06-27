@@ -1,5 +1,5 @@
 from flare.framework.algorithm import Model, Algorithm
-from flare.common import common_functions as comf
+from flare.framework import common_functions as comf
 from flare.model_zoo.simple_models import SimpleModelDeterministic
 import numpy as np
 from copy import deepcopy

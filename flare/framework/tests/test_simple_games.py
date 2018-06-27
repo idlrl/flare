@@ -48,11 +48,8 @@ class TestGymGame(unittest.TestCase):
                     nn.ReLU(), nn.Linear(128, 128), nn.ReLU())
 
                 if on_policy:
-                    alg = SimpleAC(
-                        model=SimpleModelAC(
-                            dims=state_shape, num_actions=num_actions,
-                            mlp=mlp),
-                        hyperparas=dict(lr=1e-4))
+                    alg = SimpleAC(model=SimpleModelAC(
+                        dims=state_shape, num_actions=num_actions, mlp=mlp))
                 else:
                     alg = SimpleQ(
                         model=SimpleModelQ(
@@ -60,13 +57,12 @@ class TestGymGame(unittest.TestCase):
                             num_actions=num_actions,
                             mlp=nn.Sequential(mlp,
                                               nn.Linear(128, num_actions))),
-                        hyperparas=dict(lr=1e-4),
-                        exploration_end_batches=25000,
+                        exploration_end_steps=1000000,
                         update_ref_interval=100)
 
                 print "algorithm: " + alg.__class__.__name__
 
-                ct = ComputationTask(algorithm=alg)
+                ct = ComputationTask(algorithm=alg, hyperparas=dict(lr=1e-4))
                 batch_size = 16
                 if not on_policy:
                     train_every_steps = batch_size / 4
@@ -113,7 +109,7 @@ class TestGymGame(unittest.TestCase):
                                 = unpack_exps(exps)
                             cost = ct.learn(
                                 inputs=dict(sensor=sensor),
-                                next_inputs=dict(next_sensor=next_sensor),
+                                next_inputs=dict(sensor=next_sensor),
                                 next_episode_end=dict(
                                     next_episode_end=next_episode_end),
                                 actions=dict(action=action),
