@@ -9,7 +9,8 @@ import gym
 
 
 def unpack_exps_seqs(exps_seqs):
-    return zip(*[[np.array(l) for l in zip(*exps)] for exps in exps_seqs])
+    return zip(*[[np.array(l) for l in zip(*exps)] \
+                 for exps in exps_seqs])
 
 
 def sample(past_exps, n, n_seqs):
