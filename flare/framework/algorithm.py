@@ -30,21 +30,24 @@ class Model(nn.Module):
     @abstractmethod
     def get_input_specs(self):
         """
-        Output: list of tuples
+        Output: list of '(name props)' tuples
+                where props is a dict that must contain the 'shape' keyword
         """
         pass
 
     def get_state_specs(self):
         """
         States are optional to a Model.
-        Output: list of tuples
+        Output: list of '(name props)' tuples
+                where props is a dict that must contain the 'shape' keyword
         """
         return []
 
     @abstractmethod
     def get_action_specs(self):
         """
-        Output: list of tuples
+        Output: list of '(name props)' tuples
+                where props is a dict that must contain the 'shape' keyword
         """
         pass
 
@@ -52,6 +55,9 @@ class Model(nn.Module):
         """
         By default, a scalar reward.
         User can specify a vector of rewards for some problems
+
+        Output: list of '(name props)' tuples
+                where props is a dict that must contain the 'shape' keyword
         """
         return [("reward", dict(shape=[1]))]
 
