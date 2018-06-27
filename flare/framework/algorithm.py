@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 from abc import ABCMeta, abstractmethod
 
@@ -29,21 +30,24 @@ class Model(nn.Module):
     @abstractmethod
     def get_input_specs(self):
         """
-        Output: list of tuples
+        Output: list of '(name props)' tuples
+                where props is a dict that must contain the 'shape' keyword
         """
         pass
 
     def get_state_specs(self):
         """
         States are optional to a Model.
-        Output: list of tuples
+        Output: list of '(name props)' tuples
+                where props is a dict that must contain the 'shape' keyword
         """
         return []
 
     @abstractmethod
     def get_action_specs(self):
         """
-        Output: list of tuples
+        Output: list of '(name props)' tuples
+                where props is a dict that must contain the 'shape' keyword
         """
         pass
 
@@ -51,6 +55,9 @@ class Model(nn.Module):
         """
         By default, a scalar reward.
         User can specify a vector of rewards for some problems
+
+        Output: list of '(name props)' tuples
+                where props is a dict that must contain the 'shape' keyword
         """
         return [("reward", dict(shape=[1]))]
 
@@ -83,12 +90,15 @@ class Algorithm(object):
     implement the rest of the network in the Model class.
     """
 
-    def __init__(self, model, hyperparas, gpu_id):
+    def __init__(self, model, gpu_id):
         assert isinstance(model, Model)
         check_duplicate_spec_names(model)
         self.model = model
-        self.hp = hyperparas
-        self.gpu_id = gpu_id
+        if torch.cuda.is_available() and gpu_id >= 0:
+            self.device = "cuda:" + str(gpu_id)
+        else:
+            self.device = "cpu"
+        self.model.to(self.device)
 
     def get_input_specs(self):
         return self.model.get_input_specs()
@@ -137,7 +147,7 @@ class Algorithm(object):
         """
         This function computes a learning cost to be optimized.
         The return should be the cost.
-        Output: cost(dict)
+        Output: cost(dict), states(dict)
 
         Optional: an algorithm might not implement learn()
         """

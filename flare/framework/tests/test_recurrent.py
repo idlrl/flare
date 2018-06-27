@@ -73,7 +73,7 @@ class TestRecurrentGroup(unittest.TestCase):
             We compute the first output by doing outer product between the
             average word embedding and the image embedding.
             We compute the second output by adding the average word embedding
-            and the average image embedding.
+            and the image embedding.
             We directly add the state mean value to the output
             and update the state by multiplying it with -1.
             """
@@ -139,7 +139,7 @@ class TestRecurrentGroup(unittest.TestCase):
             word_states, "float32", "cpu", [2])
 
         ## This hierarchical function does the following things:
-        ## 1. For each word in each sentence, we add the average word state
+        ## 1. For each word in each sentence, we add the word state
         ##    to the word embedding, and the word state keeps the same all the time
         ## 2. We take the last output of the words and the word states
         ## 3. In the higher level, we multiply the last word output with the sentence state,
@@ -147,7 +147,6 @@ class TestRecurrentGroup(unittest.TestCase):
         def step_func(sentence, sentence_state, word_state):
             assert isinstance(sentence, list)
 
-            ### for each sentence, we use inner_step_func to accumulate its word embeddings
             def inner_step_func(w, ws):
                 ### w is the current word emebdding
                 ### ws is the current word state
