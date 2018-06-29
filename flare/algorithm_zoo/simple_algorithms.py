@@ -44,6 +44,7 @@ class SimpleAC(Algorithm):
         dist = dist["action"]
 
         if action.dtype == torch.int64 or action.dtype == torch.int32:
+            ## for discrete actions, we need to provide scalars to log_prob()
             pg_cost = -dist.log_prob(action.squeeze(-1))
         else:
             pg_cost = -dist.log_prob(action)

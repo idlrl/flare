@@ -28,16 +28,13 @@ class TestGymGame(unittest.TestCase):
         final_rewards_thresholds = [
             -1.8,  ## drive to the right top in 180 steps (timeout is -2.0)
             1.5,  ## hold the pole for at least 150 steps
-            -3.0
+            -3.0  ## can swing the stick to the top most of the times
         ]
         on_policies = [False, True, True]
         discrete_actions = [True, True, False]
 
         for game, threshold, on_policy, discrete_action in \
             zip(games, final_rewards_thresholds, on_policies, discrete_actions):
-
-            if game != "Pendulum-v0":
-                continue
 
             env = gym.make(game)
             state_shape = env.observation_space.shape[0]
@@ -92,15 +89,15 @@ class TestGymGame(unittest.TestCase):
 
                     ## when discrete_action is True, this is a scalar
                     ## otherwise it's a floating vector
-                    pred_action = res["action"][0][0]
+                    pred_action = res["action"][0]
 
-                    next_ob, reward, next_is_over, _ = env.step(pred_action)
+                    next_ob, reward, next_is_over, _ = env.step(pred_action[
+                        0] if discrete_action else pred_action)
                     reward /= 100
                     episode_reward += reward
 
-                    past_exps.append((ob, next_ob, [pred_action]
-                                      if discrete_action else pred_action,
-                                      [reward], [not next_is_over]))
+                    past_exps.append((ob, next_ob, pred_action, [reward],
+                                      [not next_is_over]))
                     ## only for off-policy training we use a circular buffer
                     if (not on_policy) and len(past_exps) > buffer_size_limit:
                         past_exps.pop(0)

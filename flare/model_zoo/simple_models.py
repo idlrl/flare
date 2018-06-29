@@ -99,7 +99,6 @@ class SimpleRNNModelQ(Model):
     def value(self, inputs, states):
         hidden = self.hidden_layers(inputs.values()[0])
         next_state = self.recurrent(hidden, states.values()[0])
-        #        next_state = hidden
         return dict(q_value=self.value_layer(next_state)), dict(
             state=next_state)
 
