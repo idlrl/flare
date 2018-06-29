@@ -42,9 +42,12 @@ class SimpleAC(Algorithm):
 
         dist, _ = self.model.policy(inputs, states)
         dist = dist["action"]
-        assert isinstance(dist, Categorical)
 
-        pg_cost = -dist.log_prob(action.squeeze(-1))
+        if action.dtype == torch.int64 or action.dtype == torch.int32:
+            pg_cost = -dist.log_prob(action.squeeze(-1))
+        else:
+            pg_cost = -dist.log_prob(action)
+
         cost = value_cost + pg_cost * td_error.detach()
 
         return dict(cost=cost.unsqueeze(-1)), states_update, next_states_update
