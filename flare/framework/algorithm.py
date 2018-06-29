@@ -139,7 +139,10 @@ class Algorithm(object):
         distributions, states = behavior_model.policy(inputs, states)
         actions = {}
         for key, dist in distributions.iteritems():
-            actions[key] = dist.sample().unsqueeze(-1)
+            actions[key] = dist.sample()
+            if len(actions[key].size()) == 1:  ## for discrete actions
+                actions[key] = actions[key].unsqueeze(-1)
+            ## for continuous actions, each action is already a vector
         return actions, states
 
     def learn(self, inputs, next_inputs, states, next_states, next_episode_end,
