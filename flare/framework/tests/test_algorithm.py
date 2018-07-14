@@ -10,8 +10,7 @@ import unittest
 
 class TestAlgorithm(Algorithm):
     def __init__(self, model):
-        super(TestAlgorithm, self).__init__(
-            model, hyperparas=dict(), gpu_id=-1)
+        super(TestAlgorithm, self).__init__(model, gpu_id=-1)
 
     def predict(self, inputs, states):
         return self._rl_predict(self.model, inputs, states)

@@ -205,13 +205,11 @@ class TestComputationTask(unittest.TestCase):
                 rewards = (1.0 - actions).astype("float32")
                 cost = ct.learn(
                     inputs=dict(sensor=sensor),
-                    next_inputs=dict(next_sensor=next_sensor),
+                    next_inputs=dict(sensor=next_sensor),
                     next_episode_end=dict(next_episode_end=np.ones(
                         (batch_size, 1)).astype("float32")),
                     actions=dict(action=actions),
                     rewards=dict(reward=rewards))
-
-            print("final cost: ", cost["avg_cost"])
 
             ### the policy should bias towards the first action
             outputs, _ = ct.predict(inputs=dict(sensor=sensor))

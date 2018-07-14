@@ -20,7 +20,7 @@ class SimpleAC(Algorithm):
         self.discount_factor = discount_factor
 
     def learn(self, inputs, next_inputs, states, next_states, next_episode_end,
-              actions, rewards):
+              actions, next_actions, rewards):
 
         action = actions["action"]
         reward = rewards["reward"]
@@ -74,12 +74,14 @@ class SimpleQ(Algorithm):
 
         super(SimpleQ, self).__init__(model, gpu_id)
         self.discount_factor = discount_factor
-        assert update_ref_interval > 0
         self.update_ref_interval = update_ref_interval
         self.total_batches = 0
         ## create a reference model
-        self.ref_model = deepcopy(model)
-        self.ref_model.to(self.device)
+        if update_ref_interval:
+            self.ref_model = deepcopy(model)
+            self.ref_model.to(self.device)
+        else:
+            self.ref_model = model
         ## setup exploration
         if exploration_end_steps > 0:
             self.exploration_rate = 1.0
@@ -112,9 +114,9 @@ class SimpleQ(Algorithm):
         return actions, states
 
     def learn(self, inputs, next_inputs, states, next_states, next_episode_end,
-              actions, rewards):
+              actions, next_actions, rewards):
 
-        if self.total_batches % self.update_ref_interval == 0:
+        if self.update_ref_interval and self.total_batches % self.update_ref_interval == 0:
             ## copy parameters from self.model to self.ref_model
             self.ref_model.load_state_dict(self.model.state_dict())
         self.total_batches += 1
@@ -128,16 +130,47 @@ class SimpleQ(Algorithm):
         with torch.no_grad():
             next_values, next_states_update = self.ref_model.value(next_inputs,
                                                                    next_states)
-            next_q_value = next_values["q_value"] * next_episode_end[
+            next_value, _ = next_values["q_value"].max(-1)
+            next_value = next_value.unsqueeze(-1) * next_episode_end[
                 "next_episode_end"]
-            next_value, _ = next_q_value.max(-1)
-            next_value = next_value.unsqueeze(-1)
 
         assert q_value.size() == next_q_value.size()
 
         value = comf.idx_select(q_value, action)
         critic_value = reward + self.discount_factor * next_value
-        td_error = (critic_value - value).squeeze(-1)
-        cost = td_error**2
+        cost = (critic_value - value)**2
 
-        return dict(cost=cost.unsqueeze(-1)), states_update, next_states_update
+        return dict(cost=cost), states_update, next_states_update
+
+
+class SimpleSARSA(SimpleQ):
+    def __init__(self, model, gpu_id=-1, discount_factor=0.99, epsilon=0.1):
+
+        super(SimpleSARSA, self).__init__(
+            model=model,
+            gpu_id=gpu_id,
+            discount_factor=discount_factor,
+            exploration_end_steps=1,
+            exploration_end_rate=epsilon,
+            update_ref_interval=0)
+
+    def learn(self, inputs, next_inputs, states, next_states, next_episode_end,
+              actions, next_actions, rewards):
+
+        action = actions["action"]
+        next_action = next_actions["action"]
+        reward = rewards["reward"]
+
+        values, states_update = self.model.value(inputs, states)
+        q_value = values["q_value"]
+
+        with torch.no_grad():
+            next_values, next_states_update = self.model.value(next_inputs,
+                                                               next_states)
+            next_value = comf.idx_select(next_values["q_value"], next_action)
+            next_value = next_value * next_episode_end["next_episode_end"]
+
+        critic_value = reward + self.discount_factor * next_value
+        cost = (critic_value - comf.idx_select(q_value, action))**2
+
+        return dict(cost=cost), states_update, next_states_update

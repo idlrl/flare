@@ -146,7 +146,7 @@ class Algorithm(object):
         return actions, states
 
     def learn(self, inputs, next_inputs, states, next_states, next_episode_end,
-              actions, rewards):
+              actions, next_actions, rewards):
         """
         This function computes a learning cost to be optimized.
         The return should be the cost.
