@@ -1,8 +1,6 @@
 from flare.framework.computation_task import ComputationTask
 from flare.algorithm_zoo.simple_algorithms import SimpleAC, SimpleQ, SimpleSARSA
-from flare.algorithm_zoo.successor_representation import SuccessorRepresentationQ
 from flare.model_zoo.simple_models import SimpleModelAC, SimpleModelQ, GaussianPolicyModel
-from flare.model_zoo.successor_representation_models import SimpleSRModel
 import numpy as np
 import torch.nn as nn
 import unittest
@@ -67,15 +65,14 @@ class TestGymGame(unittest.TestCase):
                 nn.Linear(hidden_size, hidden_size),
                 nn.ReLU(), nn.Linear(hidden_size, hidden_size), nn.ReLU())
 
+            q_model = SimpleModelQ(
+                dims=state_shape,
+                num_actions=num_actions,
+                mlp=nn.Sequential(mlp, nn.Linear(hidden_size, num_actions)))
+
             if on_policy:
                 if discrete_action:
-                    alg = SimpleSARSA(
-                        model=SimpleModelQ(
-                            dims=state_shape,
-                            num_actions=num_actions,
-                            mlp=nn.Sequential(
-                                mlp, nn.Linear(hidden_size, num_actions))),
-                        epsilon=0.1)
+                    alg = SimpleSARSA(model=q_model, epsilon=0.1)
                 else:
                     alg = SimpleAC(model=GaussianPolicyModel(
                         dims=state_shape,
@@ -84,11 +81,7 @@ class TestGymGame(unittest.TestCase):
                         std=1.0))
             else:
                 alg = SimpleQ(
-                    model=SimpleModelQ(
-                        dims=state_shape,
-                        num_actions=num_actions,
-                        mlp=nn.Sequential(
-                            mlp, nn.Linear(hidden_size, num_actions))),
+                    model=q_model,
                     exploration_end_steps=500000,
                     update_ref_interval=100)
 
