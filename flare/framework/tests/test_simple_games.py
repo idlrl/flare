@@ -17,7 +17,7 @@ def sample(past_exps, n):
     sampled = []
     while len(sampled) < n:
         idx = np.random.randint(0, len(past_exps) - 1)
-        if not past_exps[idx][3][0]:  ## episode end sampled
+        if past_exps[idx][3][0]:  ## episode end sampled
             continue
         sampled.append((
             past_exps[idx][0],  ## ob
@@ -46,9 +46,6 @@ class TestGymGame(unittest.TestCase):
 
         for game, threshold, on_policy, discrete_action in \
             zip(games, final_rewards_thresholds, on_policies, discrete_actions):
-
-            if game == "MountainCar-v0":
-                continue
 
             env = gym.make(game)
             state_shape = env.observation_space.shape[0]
@@ -112,8 +109,7 @@ class TestGymGame(unittest.TestCase):
 
                     ## end before the env wrongly gives game_over=True for a timeout case
                     if t == max_steps - 1 or game_over:
-                        past_exps.append(
-                            (ob, pred_action, [0], [not game_over]))
+                        past_exps.append((ob, pred_action, [0], [game_over]))
                         break
                     else:
                         next_ob, reward, next_is_over, _ = env.step(
@@ -121,7 +117,7 @@ class TestGymGame(unittest.TestCase):
                         reward /= 100
                         episode_reward += reward
                         past_exps.append(
-                            (ob, pred_action, [reward], [not game_over]))
+                            (ob, pred_action, [reward], [game_over]))
 
                     ## only for off-policy training we use a circular buffer
                     if (not on_policy) and len(past_exps) > buffer_size_limit:
