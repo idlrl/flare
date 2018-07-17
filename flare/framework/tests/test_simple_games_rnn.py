@@ -134,6 +134,11 @@ class TestGymGame(unittest.TestCase):
                 if len(average_episode_reward) > 20:
                     average_episode_reward.pop(0)
 
+                ### once hit the threshold, we don't bother running
+                if sum(average_episode_reward) / len(
+                        average_episode_reward) > threshold:
+                    break
+
             ### compuare the average episode reward to reduce variance
             self.assertGreater(
                 sum(average_episode_reward) / len(average_episode_reward),

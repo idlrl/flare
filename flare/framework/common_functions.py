@@ -35,7 +35,6 @@ def idx_select(input, idx):
     else:
         assert isinstance(idx, torch.Tensor)
         assert len(idx.size()) == 2, "idx should be two-dimensional!"
-        idx_ = idx.int()
         ## This might be able to be done with .gather()
         ## However, currently there is grad issue with .gather()
         return inner_prod(input, one_hot(idx.squeeze(-1), input.size()[-1]))

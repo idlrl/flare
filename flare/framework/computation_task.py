@@ -40,6 +40,8 @@ class ComputationTask(object):
         ## We want to convert python arrays to a hierarchy of torch tensors,
         ## and put them on the device
         tensors = {}
+        if arrays_dict is None:
+            return tensors
         for name, props in specs:
             assert name in arrays_dict, "keyword %s does not exist in python arrays!" % name
             array = arrays_dict[name]
@@ -66,7 +68,7 @@ class ComputationTask(object):
             for name, t in tensors_dict.iteritems()
         }
 
-    def predict(self, inputs, states=dict()):
+    def predict(self, inputs, states=None):
         """
         ComputationTask predict API
         This function is responsible to convert Python numpy arrays to pytorch
@@ -91,10 +93,11 @@ class ComputationTask(object):
               inputs,
               next_inputs,
               next_episode_end,
-              actions,
               rewards,
-              states=dict(),
-              next_states=dict()):
+              actions,
+              next_actions=None,
+              states=None,
+              next_states=None):
         """
         ComputationTask learn API
         This function is responsible to convert Python numpy arrays to pytorch
@@ -110,6 +113,8 @@ class ComputationTask(object):
         next_episode_end = self._create_tensors(
             next_episode_end, [("next_episode_end", dict(shape=[1]))])
         actions = self._create_tensors(actions, self.alg.get_action_specs())
+        next_actions = self._create_tensors(next_actions,
+                                            self.alg.get_action_specs())
         rewards = self._create_tensors(rewards, self.alg.get_reward_specs())
 
         self.optim.zero_grad()
@@ -117,11 +122,11 @@ class ComputationTask(object):
         if states:  ## if states is not empty, we apply a recurrent_group first
 
             def outermost_step(*args):
-                ipts, nipts, nee, act, rs, sts, nsts = split_list(
+                ipts, nipts, nee, act, nact, rs, sts, nsts = split_list(
                     list(args), [
                         len(inputs), len(next_inputs), len(next_episode_end),
-                        len(actions), len(rewards), len(states),
-                        len(next_states)
+                        len(actions), len(next_actions), len(rewards),
+                        len(states), len(next_states)
                     ])
                 ## We wrap each input into a dictionary because self.alg.learn
                 ## is expected to receive dicts and output dicts
@@ -132,6 +137,7 @@ class ComputationTask(object):
                     dict(zip(next_states.keys(), nsts)),
                     dict(zip(next_episode_end.keys(), nee)),
                     dict(zip(actions.keys(), act)),
+                    dict(zip(next_actions.keys(), nact)),
                     dict(zip(rewards.keys(), rs)))
                 self.cost_keys = costs.keys()
                 return costs.values(), \
@@ -142,6 +148,7 @@ class ComputationTask(object):
                                              next_inputs.values() + \
                                              next_episode_end.values() + \
                                              actions.values() + \
+                                             next_actions.values() + \
                                              rewards.values(),
                                        insts=[],
                                        init_states=states.values() + next_states.values(),
@@ -150,7 +157,7 @@ class ComputationTask(object):
         else:
             costs, _, _ = self.alg.learn(inputs, next_inputs, states,
                                          next_states, next_episode_end,
-                                         actions, rewards)
+                                         actions, next_actions, rewards)
 
         def sum_cost(costs):
             if isinstance(costs, torch.Tensor):
