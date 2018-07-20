@@ -1,9 +1,9 @@
-from flare.framework.algorithm import Algorithm
-from flare.framework import common_functions as comf
+from copy import deepcopy
+import numpy as np
 from torch.distributions import Categorical
 import torch
-import numpy as np
-from copy import deepcopy
+from flare.framework.algorithm import Algorithm
+from flare.framework import common_functions as comf
 
 
 class SimpleAC(Algorithm):
@@ -130,9 +130,12 @@ class SimpleQ(Algorithm):
         with torch.no_grad():
             next_values, next_states_update = self.ref_model.value(next_inputs,
                                                                    next_states)
-            next_value, _ = next_values["q_value"].max(-1)
-            next_value = next_value.unsqueeze(-1) * (
+            next_q_value = next_values["q_value"] * (
                 1 - next_episode_end["next_episode_end"])
+            next_value, _ = next_q_value.max(-1)
+            next_value = next_value.unsqueeze(-1)
+
+        assert q_value.size() == next_q_value.size()
 
         value = comf.idx_select(q_value, action)
         critic_value = reward + self.discount_factor * next_value
