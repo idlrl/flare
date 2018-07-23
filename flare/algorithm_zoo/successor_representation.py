@@ -21,7 +21,8 @@ class SuccessorRepresentationQ(SimpleQ):
                  gpu_id=-1,
                  discount_factor=0.99,
                  exploration_end_steps=0,
-                 exploration_end_rate=0.1):
+                 exploration_end_rate=0.1,
+                 reward_cost_weight=1.0):
 
         super(SuccessorRepresentationQ, self).__init__(
             model=model,
@@ -30,6 +31,8 @@ class SuccessorRepresentationQ(SimpleQ):
             exploration_end_steps=exploration_end_steps,
             exploration_end_rate=exploration_end_rate,
             update_ref_interval=0)
+
+        self.reward_cost_weight = reward_cost_weight
 
     def learn(self, inputs, next_inputs, states, next_states, next_episode_end,
               actions, next_actions, rewards):
@@ -61,7 +64,7 @@ class SuccessorRepresentationQ(SimpleQ):
         # the goal and reward evaluation should be based on the current inputs
         goal = self.model.goal(inputs)
         pred_reward = comf.inner_prod(next_state_embedding, goal)
-        reward_cost = (pred_reward - reward)**2
+        reward_cost = (pred_reward - reward)**2 * self.reward_cost_weight
 
         ## 2. use Bellman equation to learn successor representation
         srs, states_update = self.model.sr(inputs, states)  ## BxAxD
