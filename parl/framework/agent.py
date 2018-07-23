@@ -16,16 +16,14 @@ from multiprocessing import Process, Value
 import numpy as np
 from threading import Lock, Thread
 from parl.common.communicator import AgentCommunicator
-from parl.common.data_process import DataProcessor
 from parl.common.replay_buffer import NoReplacementQueue, ReplayBuffer
 
 
 class AgentHelper(object):
     """
     AgentHelper abstracts some part of Agent's data processing and the I/O 
-    communication between Agent and ComputationWrapper. It receives a
-    Communicator from one ComputationWrapper and uses it to send data to the
-    ComputationWrapper.
+    communication between Agent and ComputationDataProcessor (CP). It receives a
+    Communicator from one CDP and uses it to send data to the CDP.
     """
     __metaclass__ = ABCMeta
 
@@ -46,8 +44,8 @@ class AgentHelper(object):
     @abstractmethod
     def predict(self, inputs, states):
         """
-        Process the input data (if necessary), send them to `ComputationWrapper`
-        for prediction, and receive the outcome.
+        Process the input data (if necessary), send them to CDP for prediction,
+        and receive the outcome.
 
         Args:
             inputs(dict): data used for prediction. It is caller's job 
@@ -68,9 +66,9 @@ class AgentHelper(object):
     @abstractmethod
     def learn(self):
         """
-        Sample data from past experiences and send them to `ComputationWrapper`
-        for learning. Optionally, it receives learning outcomes sent back from
-        CW and does some processing.
+        Sample data from past experiences and send them to CDP for learning. 
+        Optionally, it receives learning outcomes sent back from CW and does 
+        some processing.
 
         Depends on users' need, this function can be called in three ways:
         1. In Agent's run_one_episode
@@ -201,7 +199,7 @@ class Agent(Process):
         self.running = Value('i', 0)
         self.daemon = True
 
-    def add_helper(self, helper, pack_f, unpack_f, is_episode_end_f):
+    def add_agent_helper(self, helper, pack_f, unpack_f, is_episode_end_f):
         """
         Add an AgentHelper, with its name (also the name of its
         correspoding `ComputationTask`) as key.

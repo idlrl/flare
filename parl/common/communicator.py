@@ -34,12 +34,12 @@ class Communicator(object):
     2. `AgentCommunicator`: the communicator used by 'AgentHelper'
     """
 
-    def __init__(self, timeout):
+    def __init__(self, comm_timeout):
         """
         Args:
-            timeout(float): timeout for Queue's get and put operations.
+            comm_timeout(float): timeout for Queue's get and put operations.
         """
-        self.timeout = timeout
+        self.comm_timeout = comm_timeout
 
 
 class CTCommunicator(Communicator):
@@ -48,12 +48,12 @@ class CTCommunicator(Communicator):
     get data from and return results to the simulation side .
     """
 
-    def __init__(self, timeout):
+    def __init__(self, comm_timeout):
         """
         Create `CTCommunicator`.
 
         """
-        super(CTCommunicator, self).__init__(timeout)
+        super(CTCommunicator, self).__init__(comm_timeout)
         self.training_q = Queue()
         self.prediction_q = Queue()
 
@@ -61,7 +61,7 @@ class CTCommunicator(Communicator):
         """
         Get data in the training queue, which are put by agents.
         """
-        return self.training_q.get(timeout=self.timeout)
+        return self.training_q.get(timeout=self.comm_timeout)
 
     def training_return(self, data, comm):
         """
@@ -69,13 +69,13 @@ class CTCommunicator(Communicator):
         communicator.
         """
         assert isinstance(comm, AgentCommunicator)
-        comm.training_return_q.put(data, timeout=self.timeout)
+        comm.training_return_q.put(data, timeout=self.comm_timeout)
 
     def get_prediction_data(self):
         """
         Get data in the prediction queue, which are put by agents.
         """
-        return self.prediction_q.get(timeout=self.timeout)
+        return self.prediction_q.get(timeout=self.comm_timeout)
 
     def prediction_return(self, data, comm):
         """
@@ -83,7 +83,7 @@ class CTCommunicator(Communicator):
         communicator.
         """
         assert isinstance(comm, AgentCommunicator)
-        comm.prediction_return_q.put(data, timeout=self.timeout)
+        comm.prediction_return_q.put(data, timeout=self.comm_timeout)
 
 
 class AgentCommunicator(Communicator):
@@ -93,7 +93,7 @@ class AgentCommunicator(Communicator):
     computation side .
     """
 
-    def __init__(self, agent_id, training_q, prediction_q, timeout):
+    def __init__(self, agent_id, training_q, prediction_q, comm_timeout):
         """
         Create `AgentCommunicator`.
 
@@ -104,9 +104,9 @@ class AgentCommunicator(Communicator):
             agent_id(int): id of the agent.
             training_q(Queue), prediction_q(Queue): references to Queues owned
             by a `ComputationWrapper`.
-            timeout(float): timeout for Queue's get and put operations.
+            comm_timeout(float): timeout for Queue's get and put operations.
         """
-        super(AgentCommunicator, self).__init__(timeout)
+        super(AgentCommunicator, self).__init__(comm_timeout)
 
         self.agent_id = agent_id
         assert not training_q is None
@@ -121,14 +121,15 @@ class AgentCommunicator(Communicator):
 
     def put_training_data(self, exp_seqs):
         isinstance(exp_seqs, list)
-        self.training_q.put((self.agent_id, exp_seqs), timeout=self.timeout)
+        self.training_q.put((self.agent_id, exp_seqs),
+                            timeout=self.comm_timeout)
 
     def get_training_return(self):
-        return self.training_return_q.get(timeout=self.timeout)
+        return self.training_return_q.get(timeout=self.comm_timeout)
 
     def put_prediction_data(self, data):
         isinstance(data, dict)
-        self.prediction_q.put((self.agent_id, data), timeout=self.timeout)
+        self.prediction_q.put((self.agent_id, data), timeout=self.comm_timeout)
 
     def get_prediction_return(self):
-        return self.prediction_return_q.get(timeout=self.timeout)
+        return self.prediction_return_q.get(timeout=self.comm_timeout)

@@ -26,7 +26,7 @@ if __name__ == '__main__':
     """
     game = "MountainCar-v0"
 
-    num_agent = 1
+    num_agent = 4
     num_games = 8000
     # 1. Create environments
     envs = []
@@ -36,7 +36,7 @@ if __name__ == '__main__':
     num_actions = envs[-1].action_space.n
 
     # 2. Construct the network and specify the algorithm.
-    #    Here we use a small MLP and apply the Actor-Critic algorithm
+    #    Here we use a small MLP and apply the Q-learning algorithm
     inner_size = 256
     mlp = nn.Sequential(
         nn.Linear(state_shape, inner_size),
@@ -62,7 +62,7 @@ if __name__ == '__main__':
             # sampling
             sample_method=ExpReplayHelper,
             buffer_capacity=100000,
-            batch_size=32,
+            batch_size=16,
             num_seqs=0,  # sample instances
             # ct wrapper
             min_batchsize=1,

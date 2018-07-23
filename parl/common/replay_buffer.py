@@ -17,7 +17,6 @@ from copy import deepcopy
 from collections import deque
 import numpy as np
 import random
-from parl.common.error_handling import *
 
 
 class Experience(object):

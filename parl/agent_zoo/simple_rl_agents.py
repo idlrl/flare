@@ -88,11 +88,14 @@ class SimpleRLAgent(Agent):
             episode_end = next_episode_end
             if episode_end:
                 break
-        # we put dummy action and reward here as they will not be used
+        # we call `predict` one more time to get actions. Needed in case of
+        # non-episode-end ending.
+        actions, _ = self.predict(
+            'RL', inputs=dict(sensor=np.array([obs]).astype("float32")))
         self.store_data(
             'RL',
             sensor=obs,
-            action=[0],
+            action=actions["action"][0],
             reward=[0],
             episode_end=[episode_end])
         self.log_q.put(log_entry)
@@ -175,12 +178,15 @@ class SimpleRNNRLAgent(Agent):
             state = next_states["state"]
             if episode_end:
                 break
-        # we put dummy action and reward here as they will not be used
+        # we call `predict` one more time to get actions. Needed in case of
+        # non-episode-end ending.
+        actions, _ = self.predict(
+            'RL', inputs=dict(sensor=np.array([obs]).astype("float32")))
         self.store_data(
             'RL',
             sensor=obs,
             state=state,
-            action=[0],
+            action=actions["action"][0],
             reward=[0],
             episode_end=[episode_end])
         self.log_q.put(log_entry)

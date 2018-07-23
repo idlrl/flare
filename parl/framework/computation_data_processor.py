@@ -19,23 +19,23 @@ from parl.common.communicator import CTCommunicator, AgentCommunicator
 from parl.common.utils import concat_dicts, split_dict
 
 
-class ComputationWrapper(object):
+class ComputationDataProcessor(object):
     """
     This class batches the data from the Agent side (i.e., sent by AgentHelper)
     and sends them to ComputationTask. At the time of results returned, it
     splits the batched results and sends them back to AgentHelper.
     """
 
-    def __init__(self, name, ct, min_batchsize, max_batchsize, timeout,
+    def __init__(self, name, ct, min_batchsize, max_batchsize, comm_timeout,
                  sample_method, **kwargs):
         self.name = name
         self.ct = ct
         self.min_batchsize = min_batchsize
         self.max_batchsize = max_batchsize
-        self.timeout = timeout
+        self.comm_timeout = comm_timeout
         self.helper_creator = (
             lambda comm: sample_method(name, comm, **kwargs))
-        self.comm = CTCommunicator(self.timeout)
+        self.comm = CTCommunicator(self.comm_timeout)
         self.comms = {}
         self.prediction_thread = Thread(target=self._prediction_loop)
         self.training_thread = Thread(target=self._training_loop)
@@ -89,7 +89,7 @@ class ComputationWrapper(object):
         """
         self.comms[agent_id] = AgentCommunicator(
             agent_id, self.comm.training_q, self.comm.prediction_q,
-            self.timeout)
+            self.comm_timeout)
         return self.comms[agent_id]
 
     def do_one_prediction(self, data):

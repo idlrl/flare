@@ -20,14 +20,19 @@ from parl.common.logging import GameLogger
 
 class Manager(object):
     def __init__(self, ct_settings):
+        """
+            Initialize `Manager`. `ct_settings` is used to create
+            `ComputationTask`; The parameters in `ct_settings` are for each 
+            `ComputationTask`.
+        """
         self.agents = []
         self.cts = {}
         self.state_specs = {}
-        self.wrappers = {}
+        self.CDPs = {}
         for name, setting in ct_settings.iteritems():
             self.cts[name] = ComputationTask(name, **setting)
             self.state_specs[name] = self.cts[name].get_state_specs()
-            self.wrappers[name] = self.cts[name].wrapper
+            self.CDPs[name] = self.cts[name].CDP
         self.logger = GameLogger(1, 100)
 
     def add_agent(self, agent):
@@ -35,9 +40,9 @@ class Manager(object):
         # `Agent` needs to know the state specs to prepare state data
         agent.make_initial_states(self.state_specs)
         self.agents.append(agent)
-        for name, wrapper in self.wrappers.iteritems():
-            agent.add_helper(
-                wrapper.create_helper(agent.id), agent.pack_exps,
+        for name, cdp in self.CDPs.iteritems():
+            agent.add_agent_helper(
+                cdp.create_helper(agent.id), agent.pack_exps,
                 agent.unpack_exp_seqs, agent.is_episode_end)
             agent.log_q = self.logger.log_q
 
@@ -48,15 +53,15 @@ class Manager(object):
 
     def start(self):
         self.logger.start()
-        for wrapper in self.wrappers.values():
-            wrapper.run()
+        for cdp in self.CDPs.values():
+            cdp.run()
         for agent in self.agents:
             agent.start()
 
         while self.agents:
             self.agents[-1].join()
             self.agents.pop()
-        for wrapper in self.wrappers.values():
-            wrapper.stop()
+        for cdp in self.CDPs.values():
+            cdp.stop()
         self.logger.running.value = False
         self.logger.join()
