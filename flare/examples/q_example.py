@@ -26,11 +26,11 @@ if __name__ == '__main__':
     """
     game = "MountainCar-v0"
 
-    num_agent = 4
+    num_agents = 1
     num_games = 8000
     # 1. Create environments
     envs = []
-    for _ in range(num_agent):
+    for _ in range(num_agents):
         envs.append(gym.make(game))
     state_shape = envs[-1].observation_space.shape[0]
     num_actions = envs[-1].action_space.n
@@ -57,17 +57,17 @@ if __name__ == '__main__':
     # settings used by ComputationTask.
     ct_settings = {
         "RL": dict(
+            num_agents=num_agents,
             algorithm=alg,
             hyperparas=dict(lr=1e-4),
             # sampling
             sample_method=ExpReplayHelper,
             buffer_capacity=100000,
-            batch_size=16,
+            sample_size=32,
             num_seqs=0,  # sample instances
             # ct wrapper
-            min_batchsize=1,
-            max_batchsize=16,
-            timeout=1)
+            min_agents_per_batch=1,
+            max_agents_per_batch=16)
     }
 
     # 4. Create Manager that handles the running of the whole framework

@@ -1,17 +1,3 @@
-#   Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 from multiprocessing import Queue
 from Queue import Empty, Full
 from threading import Thread, Lock
@@ -26,16 +12,26 @@ class ComputationDataProcessor(object):
     splits the batched results and sends them back to AgentHelper.
     """
 
-    def __init__(self, name, ct, min_batchsize, max_batchsize, comm_timeout,
-                 sample_method, **kwargs):
+    def __init__(self,
+                 name,
+                 ct,
+                 sample_method,
+                 num_agents,
+                 min_agents_per_batch=1,
+                 max_agents_per_batch=1,
+                 **kwargs):
         self.name = name
         self.ct = ct
-        self.min_batchsize = min_batchsize
-        self.max_batchsize = max_batchsize
-        self.comm_timeout = comm_timeout
+        self.min_agents_per_batch = min(min_agents_per_batch, num_agents)
+        self.max_agents_per_batch = min(max_agents_per_batch, num_agents)
+        # for on policy algorithms, we use A2C, that is a training iteration
+        # waits for all agents' data
+        if sample_method.on_policy:
+            self.min_agents_per_batch = num_agents
+            self.max_agents_per_batch = num_agents
         self.helper_creator = (
             lambda comm: sample_method(name, comm, **kwargs))
-        self.comm = CTCommunicator(self.comm_timeout)
+        self.comm = CTCommunicator()
         self.comms = {}
         self.prediction_thread = Thread(target=self._prediction_loop)
         self.training_thread = Thread(target=self._training_loop)
@@ -75,7 +71,7 @@ class ComputationDataProcessor(object):
 
         return zip(*ret)
 
-    def create_helper(self, agent_id):
+    def create_agent_helper(self, agent_id):
         comm = self.__create_communicator(agent_id)
         return self.helper_creator(comm)
 
@@ -88,8 +84,7 @@ class ComputationDataProcessor(object):
         this CW through the communicator.
         """
         self.comms[agent_id] = AgentCommunicator(
-            agent_id, self.comm.training_q, self.comm.prediction_q,
-            self.comm_timeout)
+            agent_id, self.comm.training_q, self.comm.prediction_q)
         return self.comms[agent_id]
 
     def do_one_prediction(self, data):
@@ -107,11 +102,11 @@ class ComputationDataProcessor(object):
         return ret
 
     def _prediction_loop(self):
+        agent_ids = []
+        data = []
         while not self.exit_flag:
-            agent_ids = []
-            data = []
             try:
-                while not agent_ids or not self.comm.prediction_q.empty():
+                while len(agent_ids) < self.min_agents_per_batch:
                     agent_id, d = self.comm.get_prediction_data()
                     agent_ids.append(agent_id)
                     data.append(d)
@@ -123,16 +118,19 @@ class ComputationDataProcessor(object):
                 for i in range(len(agent_ids)):
                     self.comm.prediction_return(ret[i],
                                                 self.comms[agent_ids[i]])
-            except Full as e:
-                continue
-
-    def _training_loop(self):
-        while not self.exit_flag:
+            except Full:
+                pass
             agent_ids = []
             data = []
+
+    def _training_loop(self):
+        agent_ids = []
+        data = []
+        while not self.exit_flag:
             try:
-                while (len(agent_ids) < self.min_batchsize or
-                       len(agent_ids) < self.max_batchsize and
+                while (len(agent_ids) < self.min_agents_per_batch or
+                       len(agent_ids) >= self.min_agents_per_batch and
+                       len(agent_ids) < self.max_agents_per_batch and
                        not self.comm.training_q.empty()):
                     agent_id, d = self.comm.get_training_data()
                     agent_ids.append(agent_id)
@@ -145,7 +143,9 @@ class ComputationDataProcessor(object):
                 for i in range(len(agent_ids)):
                     self.comm.training_return(ret, self.comms[agent_ids[i]])
             except Full as e:
-                continue
+                pass
+            agent_ids = []
+            data = []
 
     def run(self):
         self.exit_flag = False

@@ -57,8 +57,7 @@ if __name__ == '__main__':
             sample_interval=8,
             # ct wrapper
             min_batchsize=1,
-            max_batchsize=16,
-            timeout=1)
+            max_batchsize=16)
     }
 
     # 4. Create Manager that handles the running of the whole framework

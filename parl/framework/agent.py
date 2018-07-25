@@ -1,16 +1,3 @@
-#   Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at #
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 from abc import ABCMeta, abstractmethod
 from multiprocessing import Process, Value
 import numpy as np
@@ -27,9 +14,12 @@ class AgentHelper(object):
     """
     __metaclass__ = ABCMeta
 
-    def __init__(self, name, communicator):
+    __on_policy = False
+
+    def __init__(self, name, on_policy, communicator):
         assert isinstance(communicator, AgentCommunicator)
         self.name = name
+        self.__on_policy = on_policy
         self.comm = communicator
         self.pack_func = None
         self.unpack_func = None
@@ -40,6 +30,10 @@ class AgentHelper(object):
 
     def stop(self):
         pass
+
+    @classmethod
+    def on_policy(cls):
+        return self.__on_policy
 
     @abstractmethod
     def predict(self, inputs, states):
@@ -88,7 +82,7 @@ class OnPolicyHelper(AgentHelper):
 
     def __init__(self, name, communicator, sample_interval=5,
                  sample_seq=False):
-        super(OnPolicyHelper, self).__init__(name, communicator)
+        super(OnPolicyHelper, self).__init__(name, True, communicator)
         self.sample_interval = sample_interval
         # NoReplacementQueue used to store past experience.
         # TODO: support sequence sampling 
@@ -105,7 +99,7 @@ class OnPolicyHelper(AgentHelper):
         t = self.pack_func(**kwargs)
         self.exp_queue.add(t)
         self.counter += 1
-        if self.is_episode_end(t) or self.counter % self.sample_interval == 0:
+        if self.counter % self.sample_interval == 0:
             self.learn()
             self.counter = 0
 
@@ -122,12 +116,12 @@ class ExpReplayHelper(AgentHelper):
     run learn().
     """
 
-    def __init__(self, name, communicator, buffer_capacity, batch_size,
+    def __init__(self, name, communicator, buffer_capacity, sample_size,
                  num_seqs):
-        super(ExpReplayHelper, self).__init__(name, communicator)
+        super(ExpReplayHelper, self).__init__(name, False, communicator)
         # replay buffer for experience replay
         self.replay_buffer = ReplayBuffer(buffer_capacity)
-        self.batch_size = batch_size
+        self.sample_size = sample_size
         self.num_seqs = num_seqs
         # the thread that will run learn()
         self.learning_thread = Thread(target=self.learn)
@@ -164,7 +158,7 @@ class ExpReplayHelper(AgentHelper):
         while self.running.value:
             with self.lock:
                 exp_seqs = self.replay_buffer.sample(
-                    self.batch_size, self.is_episode_end, self.num_seqs)
+                    self.sample_size, self.is_episode_end, self.num_seqs)
             if not exp_seqs:
                 continue
             data, size = self.unpack_func(exp_seqs)

@@ -42,7 +42,7 @@ class Manager(object):
         self.agents.append(agent)
         for name, cdp in self.CDPs.iteritems():
             agent.add_agent_helper(
-                cdp.create_helper(agent.id), agent.pack_exps,
+                cdp.create_agent_helper(agent.id), agent.pack_exps,
                 agent.unpack_exp_seqs, agent.is_episode_end)
             agent.log_q = self.logger.log_q
 

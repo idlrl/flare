@@ -1,17 +1,3 @@
-#   Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 from multiprocessing import Queue
 
 
@@ -34,12 +20,11 @@ class Communicator(object):
     2. `AgentCommunicator`: the communicator used by 'AgentHelper'
     """
 
-    def __init__(self, comm_timeout):
+    def __init__(self):
         """
         Args:
             comm_timeout(float): timeout for Queue's get and put operations.
         """
-        self.comm_timeout = comm_timeout
 
 
 class CTCommunicator(Communicator):
@@ -48,14 +33,15 @@ class CTCommunicator(Communicator):
     get data from and return results to the simulation side .
     """
 
-    def __init__(self, comm_timeout):
+    def __init__(self):
         """
         Create `CTCommunicator`.
 
         """
-        super(CTCommunicator, self).__init__(comm_timeout)
+        super(CTCommunicator, self).__init__()
         self.training_q = Queue()
         self.prediction_q = Queue()
+        self.comm_timeout = 1
 
     def get_training_data(self):
         """
@@ -93,7 +79,7 @@ class AgentCommunicator(Communicator):
     computation side .
     """
 
-    def __init__(self, agent_id, training_q, prediction_q, comm_timeout):
+    def __init__(self, agent_id, training_q, prediction_q):
         """
         Create `AgentCommunicator`.
 
@@ -106,7 +92,7 @@ class AgentCommunicator(Communicator):
             by a `ComputationWrapper`.
             comm_timeout(float): timeout for Queue's get and put operations.
         """
-        super(AgentCommunicator, self).__init__(comm_timeout)
+        super(AgentCommunicator, self).__init__()
 
         self.agent_id = agent_id
         assert not training_q is None
@@ -121,15 +107,14 @@ class AgentCommunicator(Communicator):
 
     def put_training_data(self, exp_seqs):
         isinstance(exp_seqs, list)
-        self.training_q.put((self.agent_id, exp_seqs),
-                            timeout=self.comm_timeout)
+        self.training_q.put((self.agent_id, exp_seqs))
 
     def get_training_return(self):
-        return self.training_return_q.get(timeout=self.comm_timeout)
+        return self.training_return_q.get()
 
     def put_prediction_data(self, data):
         isinstance(data, dict)
-        self.prediction_q.put((self.agent_id, data), timeout=self.comm_timeout)
+        self.prediction_q.put((self.agent_id, data))
 
     def get_prediction_return(self):
-        return self.prediction_return_q.get(timeout=self.comm_timeout)
+        return self.prediction_return_q.get()

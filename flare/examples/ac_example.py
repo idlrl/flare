@@ -13,11 +13,11 @@ if __name__ == '__main__':
     """
     game = "CartPole-v0"
 
-    num_agent = 1
+    num_agents = 8
     num_games = 8000
     # 1. Create environments
     envs = []
-    for _ in range(num_agent):
+    for _ in range(num_agents):
         envs.append(gym.make(game))
     state_shape = envs[-1].observation_space.shape[0]
     num_actions = envs[-1].action_space.n
@@ -41,11 +41,9 @@ if __name__ == '__main__':
             hyperparas=dict(lr=1e-4),
             # sampling
             sample_method=OnPolicyHelper,
+            # each agent will call `learn()` every `sample_interval` steps
             sample_interval=8,
-            # ct wrapper
-            min_batchsize=1,
-            max_batchsize=16,
-            comm_timeout=1)
+            num_agents=num_agents)
     }
 
     # 4. Create Manager that handles the running of the whole framework
