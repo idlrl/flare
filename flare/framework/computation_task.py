@@ -41,7 +41,7 @@ class ComputationTask(object):
         ## and put them on the device
         tensors = {}
         if arrays_dict is None:
-            return tensors
+            return {}
         for name, props in specs:
             assert name in arrays_dict, "keyword %s does not exist in python arrays!" % name
             array = arrays_dict[name]
@@ -117,48 +117,6 @@ class ComputationTask(object):
                                             self.alg.get_action_specs())
         rewards = self._create_tensors(rewards, self.alg.get_reward_specs())
 
-        self.optim.zero_grad()
-
-        if states:  ## if states is not empty, we apply a recurrent_group first
-
-            def outermost_step(*args):
-                ipts, nipts, nee, act, nact, rs, sts, nsts = split_list(
-                    list(args), [
-                        len(inputs), len(next_inputs), len(next_episode_end),
-                        len(actions), len(next_actions), len(rewards),
-                        len(states), len(next_states)
-                    ])
-                ## We wrap each input into a dictionary because self.alg.learn
-                ## is expected to receive dicts and output dicts
-                costs, sts_update, nsts_update = self.alg.learn(
-                    dict(zip(inputs.keys(), ipts)),
-                    dict(zip(next_inputs.keys(), nipts)),
-                    dict(zip(states.keys(), sts)),
-                    dict(zip(next_states.keys(), nsts)),
-                    dict(zip(next_episode_end.keys(), nee)),
-                    dict(zip(actions.keys(), act)),
-                    dict(zip(next_actions.keys(), nact)),
-                    dict(zip(rewards.keys(), rs)))
-                self.cost_keys = costs.keys()
-                return costs.values(), \
-                    [sts_update[k] for k in states.keys()] + \
-                    [nsts_update[k] for k in next_states.keys()]
-
-            costs = rc.recurrent_group(seq_inputs=inputs.values() + \
-                                             next_inputs.values() + \
-                                             next_episode_end.values() + \
-                                             actions.values() + \
-                                             next_actions.values() + \
-                                             rewards.values(),
-                                       insts=[],
-                                       init_states=states.values() + next_states.values(),
-                                       step_func=outermost_step)
-            costs = dict(zip(self.cost_keys, costs))
-        else:
-            costs, _, _ = self.alg.learn(inputs, next_inputs, states,
-                                         next_states, next_episode_end,
-                                         actions, next_actions, rewards)
-
         def sum_cost(costs):
             if isinstance(costs, torch.Tensor):
                 return (costs.view(-1).sum(), reduce(operator.mul,
@@ -167,10 +125,53 @@ class ComputationTask(object):
             costs, ns = zip(*map(sum_cost, costs))
             return sum(costs), sum(ns)
 
-        ### backward and step
-        total_cost, total = sum_cost(costs["cost"])
-        avg_cost = total_cost / total
-        avg_cost.backward()
-        self.optim.step()
+        for i in range(self.alg.iterations_per_batch):
+            self.optim.zero_grad()
+            if states:  ## if states is not empty, we apply a recurrent_group first
+
+                def outermost_step(*args):
+                    ipts, nipts, nee, act, nact, rs, sts, nsts = split_list(
+                        list(args), [
+                            len(inputs), len(next_inputs),
+                            len(next_episode_end), len(actions),
+                            len(next_actions), len(rewards), len(states),
+                            len(next_states)
+                        ])
+                    ## We wrap each input into a dictionary because self.alg.learn
+                    ## is expected to receive dicts and output dicts
+                    costs, sts_update, nsts_update = self.alg.learn(
+                        dict(zip(inputs.keys(), ipts)),
+                        dict(zip(next_inputs.keys(), nipts)),
+                        dict(zip(states.keys(), sts)),
+                        dict(zip(next_states.keys(), nsts)),
+                        dict(zip(next_episode_end.keys(), nee)),
+                        dict(zip(actions.keys(), act)),
+                        dict(zip(next_actions.keys(), nact)),
+                        dict(zip(rewards.keys(), rs)))
+                    self.cost_keys = costs.keys()
+                    return costs.values(), \
+                        [sts_update[k] for k in states.keys()] + \
+                        [nsts_update[k] for k in next_states.keys()]
+
+                costs = rc.recurrent_group(seq_inputs=inputs.values() + \
+                                                 next_inputs.values() + \
+                                                 next_episode_end.values() + \
+                                                 actions.values() + \
+                                                 next_actions.values() + \
+                                                 rewards.values(),
+                                           insts=[],
+                                           init_states=states.values() + next_states.values(),
+                                           step_func=outermost_step)
+                costs = dict(zip(self.cost_keys, costs))
+            else:
+                costs, _, _ = self.alg.learn(inputs, next_inputs, states,
+                                             next_states, next_episode_end,
+                                             actions, next_actions, rewards)
+
+            ### backward and step
+            total_cost, total = sum_cost(costs["cost"])
+            avg_cost = total_cost / total
+            avg_cost.backward()
+            self.optim.step()
 
         return self._retrieve_np_arrays(costs)

@@ -9,15 +9,20 @@ from copy import deepcopy
 class SimpleAC(Algorithm):
     """
     A simple Actor-Critic that has a feedforward policy network and
-    a single discrete action.
+    a single action.
 
     learn() requires keywords: "action", "reward", "v_value"
     """
 
-    def __init__(self, model, gpu_id=-1, discount_factor=0.99):
+    def __init__(self,
+                 model,
+                 gpu_id=-1,
+                 discount_factor=0.99,
+                 value_cost_weight=1.0):
 
         super(SimpleAC, self).__init__(model, gpu_id)
         self.discount_factor = discount_factor
+        self.value_cost_weight = value_cost_weight
 
     def learn(self, inputs, next_inputs, states, next_states, next_episode_end,
               actions, next_actions, rewards):
@@ -49,7 +54,8 @@ class SimpleAC(Algorithm):
         else:
             pg_cost = -dist.log_prob(action)
 
-        cost = value_cost + pg_cost * td_error.detach()
+        cost = self.value_cost_weight * value_cost + pg_cost * td_error.detach(
+        )
 
         return dict(cost=cost.unsqueeze(-1)), states_update, next_states_update
 
