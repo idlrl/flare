@@ -1,6 +1,8 @@
 from flare.framework.computation_task import ComputationTask
 from flare.algorithm_zoo.simple_algorithms import SimpleAC, SimpleQ, SimpleSARSA
 from flare.model_zoo.simple_models import SimpleModelAC, SimpleModelQ, GaussianPolicyModel
+from flare.algorithm_zoo.successor_representation import SuccessorRepresentationQ
+from flare.model_zoo.successor_representation_models import SimpleSRModel
 import numpy as np
 import torch.nn as nn
 import unittest
@@ -69,7 +71,14 @@ class TestGymGame(unittest.TestCase):
 
             if on_policy:
                 if discrete_action:
-                    alg = SimpleSARSA(model=q_model, epsilon=0.1)
+                    # alg = SimpleSARSA(model=q_model, epsilon=0.1)
+                    alg = SuccessorRepresentationQ(
+                        ## much slower than SARSA because of more things to learn
+                        model=SimpleSRModel(
+                            dims=state_shape,
+                            hidden_size=hidden_size,
+                            num_actions=num_actions, ),
+                        exploration_end_steps=20000)
                 else:
                     alg = SimpleAC(model=GaussianPolicyModel(
                         dims=state_shape,
