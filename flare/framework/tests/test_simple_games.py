@@ -105,7 +105,7 @@ class TestGymGame(unittest.TestCase):
 
             print "algorithm: " + alg.__class__.__name__
 
-            ct = ComputationTask(algorithm=alg, hyperparas=dict(lr=1e-4))
+            ct = ComputationTask("RL", algorithm=alg, hyperparas=dict(lr=1e-4))
             batch_size = 32
             if not on_policy:
                 train_every_steps = batch_size / 4

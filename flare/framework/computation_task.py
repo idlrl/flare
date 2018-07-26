@@ -4,6 +4,7 @@ from algorithm import Model, Algorithm
 import recurrent as rc
 import numpy as np
 import operator
+from parl.framework.computation_data_processor import ComputationDataProcessor
 
 
 def split_list(l, sizes):
@@ -29,12 +30,25 @@ class ComputationTask(object):
     c. define a ComputationTask with the algorithm
     """
 
-    def __init__(self, algorithm, hyperparas=dict(lr=1e-4)):
+    def __init__(self, name, algorithm, hyperparas=dict(lr=1e-4), **kwargs):
         assert isinstance(algorithm, Algorithm)
+        self.name = name
         self.hp = hyperparas
         self.alg = algorithm
         self.optim = optim.RMSprop(
             self.alg.model.parameters(), lr=hyperparas["lr"])
+        self._cdp_args = kwargs
+        self._cdp = None
+
+    def get_state_specs(self):
+        return self.alg.get_state_specs()
+
+    @property
+    def CDP(self):
+        if self._cdp is None:
+            self._cdp = ComputationDataProcessor(self.name, self,
+                                                 **self._cdp_args)
+        return self._cdp
 
     def _create_tensors(self, arrays_dict, specs):
         ## We want to convert python arrays to a hierarchy of torch tensors,

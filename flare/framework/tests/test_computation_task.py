@@ -37,7 +37,7 @@ class TestModelCNN(Model):
             nn.ReLU(),
             nn.Linear(
                 16, num_actions, bias=False),
-            nn.Softmax())
+            nn.Softmax(dim=1))
 
     def get_input_specs(self):
         ## image format CHW
@@ -106,8 +106,8 @@ class TestComputationTask(unittest.TestCase):
         sensor = np.zeros([batch_size, dims]).astype("float32")
         image = np.zeros([batch_size, 1, height, width]).astype("float32")
 
-        ct0 = ComputationTask(algorithm=q_cnn)
-        ct1 = ComputationTask(algorithm=q)
+        ct0 = ComputationTask("test", algorithm=q_cnn)
+        ct1 = ComputationTask("test", algorithm=q)
 
         test(dict(image=image), ct0, max=False)
         test(dict(sensor=sensor), ct1, max=True)
@@ -118,8 +118,8 @@ class TestComputationTask(unittest.TestCase):
         """
         alg = TestAlgorithm(model=SimpleModelDeterministic(
             dims=10, mlp=nn.Linear(10, 10)))
-        ct0 = ComputationTask(algorithm=alg)
-        ct1 = ComputationTask(algorithm=alg)
+        ct0 = ComputationTask("test", algorithm=alg)
+        ct1 = ComputationTask("test", algorithm=alg)
 
         batch_size = 10
         sensor = np.random.uniform(
@@ -139,8 +139,8 @@ class TestComputationTask(unittest.TestCase):
         alg = TestAlgorithm(model=SimpleModelDeterministic(
             dims=10, mlp=nn.Linear(10, 10)))
 
-        ct0 = ComputationTask(algorithm=alg)
-        ct1 = ComputationTask(algorithm=deepcopy(alg))
+        ct0 = ComputationTask("test", algorithm=alg)
+        ct1 = ComputationTask("test", algorithm=deepcopy(alg))
 
         batch_size = 10
         sensor = np.random.uniform(
@@ -175,7 +175,8 @@ class TestComputationTask(unittest.TestCase):
                         nn.Linear(
                             64, 32, bias=False),
                         nn.ReLU())))
-                ct = ComputationTask(algorithm=alg, hyperparas=dict(lr=1e-1))
+                ct = ComputationTask(
+                    "test", algorithm=alg, hyperparas=dict(lr=1e-1))
             else:
                 alg = SimpleQ(
                     model=SimpleModelQ(
@@ -191,7 +192,8 @@ class TestComputationTask(unittest.TestCase):
                             nn.Linear(
                                 32, num_actions, bias=False))),
                     update_ref_interval=100)
-                ct = ComputationTask(algorithm=alg, hyperparas=dict(lr=1e-1))
+                ct = ComputationTask(
+                    "test", algorithm=alg, hyperparas=dict(lr=1e-1))
 
             for i in range(1000):
                 if on_policy:
