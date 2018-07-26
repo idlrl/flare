@@ -26,6 +26,7 @@ class SimpleRLAgent(Agent):
     @classmethod
     def unpack_exp_seqs(cls, exp_seqs):
         size = sum([len(exp_seq) - 1 for exp_seq in exp_seqs])
+
         t = zip(*[[np.array(l) for l in zip(*exp_seq[:-1])] \
                   for exp_seq in exp_seqs])
         t_next = zip(*[[np.array(l) for l in zip(*exp_seq[1:])] \
@@ -110,14 +111,23 @@ class SimpleRNNRLAgent(Agent):
     @classmethod
     def unpack_exp_seqs(cls, exp_seqs):
         size = len(exp_seqs)
-        t = zip(*[[np.array(l) for l in zip(*exp_seq[:-1])] \
-                  for exp_seq in exp_seqs])
-        t_next = zip(*[[np.array(l) for l in zip(*exp_seq[1:])] \
-                  for exp_seq in exp_seqs])
-        sensor, action, reward = [t[i] for i in [0, 2, 3]]
-        state = np.concatenate([r[0] for r in t[1]])
-        next_sensor, next_episode_end = [t_next[i] for i in [0, 4]]
-        next_state = np.concatenate([r[0] for r in t_next[1]])
+        t = [[np.array(l) for l in zip(*exp_seq[:-1])] for exp_seq in exp_seqs]
+        sensor = [l[0] for l in t]
+        state = np.concatenate([l[1][0] for l in t])
+        action = [l[2] for l in t]
+        reward = [l[3] for l in t]
+
+        t_next = [[np.array(l) for l in zip(*exp_seq[1:])]
+                  for exp_seq in exp_seqs]
+        next_sensor = [l[0] for l in t_next]
+        next_state = np.concatenate([l[1][0] for l in t_next])
+        next_episode_end = [l[4] for l in t_next]
+        #t_next = zip(*[[np.array(l) for l in zip(*exp_seq[1:])] \
+        #          for exp_seq in exp_seqs])
+        #sensor, action, reward = [t[i] for i in [0, 2, 3]]
+        #state = np.concatenate([r[0] for r in t[1]])
+        #next_sensor, next_episode_end = [t_next[i] for i in [0, 4]]
+        #next_state = np.concatenate([r[0] for r in t_next[1]])
         data = dict(
             inputs=dict(sensor=sensor),
             next_inputs=dict(sensor=next_sensor),
@@ -166,8 +176,10 @@ class SimpleRNNRLAgent(Agent):
                 break
         # we call `predict` one more time to get actions. Needed in case of
         # non-episode-end ending.
-        actions, _ = self.predict(
-            'RL', inputs=dict(sensor=np.array([obs]).astype("float32")))
+        actions, next_states = self.predict(
+            'RL',
+            inputs=dict(sensor=np.array([obs]).astype("float32")),
+            states=dict(state=state))
         self.store_data(
             'RL',
             sensor=obs,

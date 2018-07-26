@@ -116,12 +116,12 @@ class ExpReplayHelper(AgentHelper):
     run learn().
     """
 
-    def __init__(self, name, communicator, buffer_capacity, sample_size,
+    def __init__(self, name, communicator, buffer_capacity, num_samples,
                  num_seqs):
         super(ExpReplayHelper, self).__init__(name, False, communicator)
         # replay buffer for experience replay
         self.replay_buffer = ReplayBuffer(buffer_capacity)
-        self.sample_size = sample_size
+        self.num_samples = num_samples
         self.num_seqs = num_seqs
         # the thread that will run learn()
         self.learning_thread = Thread(target=self.learn)

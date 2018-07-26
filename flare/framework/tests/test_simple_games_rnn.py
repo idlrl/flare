@@ -71,7 +71,8 @@ class TestGymGame(unittest.TestCase):
 
             print "algorithm: " + alg.__class__.__name__
 
-            ct = ComputationTask(algorithm=alg, hyperparas=dict(lr=1e-4))
+            ct = ComputationTask(
+                "RNNRL", algorithm=alg, hyperparas=dict(lr=1e-4))
 
             average_episode_reward = []
             past_exps = []

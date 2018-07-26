@@ -26,7 +26,7 @@ if __name__ == '__main__':
     """
     game = "MountainCar-v0"
 
-    num_agents = 1
+    num_agents = 8
     num_games = 8000
     # 1. Create environments
     envs = []
@@ -67,7 +67,7 @@ if __name__ == '__main__':
             num_seqs=0,  # sample instances
             # ct wrapper
             min_agents_per_batch=1,
-            max_agents_per_batch=16)
+            max_agents_per_batch=8)
     }
 
     # 4. Create Manager that handles the running of the whole framework
