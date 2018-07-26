@@ -122,12 +122,6 @@ class SimpleRNNRLAgent(Agent):
         next_sensor = [l[0] for l in t_next]
         next_state = np.concatenate([l[1][0] for l in t_next])
         next_episode_end = [l[4] for l in t_next]
-        #t_next = zip(*[[np.array(l) for l in zip(*exp_seq[1:])] \
-        #          for exp_seq in exp_seqs])
-        #sensor, action, reward = [t[i] for i in [0, 2, 3]]
-        #state = np.concatenate([r[0] for r in t[1]])
-        #next_sensor, next_episode_end = [t_next[i] for i in [0, 4]]
-        #next_state = np.concatenate([r[0] for r in t_next[1]])
         data = dict(
             inputs=dict(sensor=sensor),
             next_inputs=dict(sensor=next_sensor),
