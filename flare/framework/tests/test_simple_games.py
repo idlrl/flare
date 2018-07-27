@@ -12,7 +12,6 @@ import gym
 
 
 def unpack_exps(exps):
-    #np.array(l).astype('int' if i== else 'float32')
     ret = []
     for i, l in enumerate(zip(*exps)):
         dct = dict()
@@ -130,18 +129,16 @@ class TestGymGame(unittest.TestCase):
 
                     ## end before the env wrongly gives game_over=True for a timeout case
                     if t == max_steps - 1 or game_over:
-                        past_exps.append(
-                            (inputs, res, dict(reward=[[0]]),
-                             dict(next_episode_end=[[game_over]])))
+                        past_exps.append((inputs, res, dict(reward=[[0]]),
+                                          dict(episode_end=[[game_over]])))
                         break
                     else:
                         next_ob, reward, next_is_over, _ = env.step(
                             pred_action[0] if discrete_action else pred_action)
                         reward /= 100
                         episode_reward += reward
-                        past_exps.append(
-                            (inputs, res, dict(reward=[[reward]]),
-                             dict(next_episode_end=[[game_over]])))
+                        past_exps.append((inputs, res, dict(reward=[[reward]]),
+                                          dict(episode_end=[[game_over]])))
 
                     ## only for off-policy training we use a circular buffer
                     if (not on_policy) and len(past_exps) > buffer_size_limit:

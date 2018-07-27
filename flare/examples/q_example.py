@@ -52,8 +52,8 @@ if __name__ == '__main__':
         exploration_end_steps=200000,
         update_ref_interval=100)
 
-    # 3. Specify the settings for learning: the algorithm to use (SimpleAC 
-    # in this case), data sampling strategy (OnPolicyHelper here) and other 
+    # 3. Specify the settings for learning: the algorithm to use (SimpleAC
+    # in this case), data sampling strategy (OnPolicyHelper here) and other
     # settings used by ComputationTask.
     ct_settings = {
         "RL": dict(
@@ -61,9 +61,9 @@ if __name__ == '__main__':
             algorithm=alg,
             hyperparas=dict(lr=1e-4),
             # sampling
-            sample_method=ExpReplayHelper,
+            agent_helper=ExpReplayHelper,
             buffer_capacity=100000,
-            num_samples=32,
+            num_experiences=32,
             num_seqs=0,  # sample instances
             # ct wrapper
             min_agents_per_batch=1,
@@ -73,8 +73,8 @@ if __name__ == '__main__':
     # 4. Create Manager that handles the running of the whole framework
     manager = Manager(ct_settings)
 
-    # 5. Spawn one agent for each instance of environment. 
-    #    Agent's behavior depends on the actual algorithm being used. Since we 
+    # 5. Spawn one agent for each instance of environment.
+    #    Agent's behavior depends on the actual algorithm being used. Since we
     #    are using SimpleAC, a proper type of Agent is SimpleRLAgent.
     for env in envs:
         agent = SimpleRLAgent(env, num_games)

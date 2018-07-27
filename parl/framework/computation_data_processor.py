@@ -15,7 +15,7 @@ class ComputationDataProcessor(object):
     def __init__(self,
                  name,
                  ct,
-                 sample_method,
+                 agent_helper,
                  num_agents,
                  min_agents_per_batch=1,
                  max_agents_per_batch=1,
@@ -24,13 +24,12 @@ class ComputationDataProcessor(object):
         self.ct = ct
         self.min_agents_per_batch = min(min_agents_per_batch, num_agents)
         self.max_agents_per_batch = min(max_agents_per_batch, num_agents)
-        # for on policy algorithms, we use A2C, that is a training iteration
-        # waits for all agents' data
-        if sample_method.on_policy:
+        # for algorithms that do not use replay, we use A2C, that is a
+        # training iteration waits for all agents' data
+        if not agent_helper.exp_replay():
             self.min_agents_per_batch = num_agents
             self.max_agents_per_batch = num_agents
-        self.helper_creator = (
-            lambda comm: sample_method(name, comm, **kwargs))
+        self.helper_creator = (lambda comm: agent_helper(name, comm, **kwargs))
         self.comm = CTCommunicator()
         self.comms = {}
         self.prediction_thread = Thread(target=self._prediction_loop)
@@ -58,10 +57,10 @@ class ComputationDataProcessor(object):
 
     def _unpack_data(self, batch_dict_list, starts):
         """
-        Unpack the dict into a list of dict, by slicing each value in the dict.        
+        Unpack the dict into a list of dict, by slicing each value in the dict.
 
         Args:
-            batch_dict(dict): 
+            batch_dict(dict):
         """
         ret = []
         for batch_dict in batch_dict_list:
@@ -79,8 +78,8 @@ class ComputationDataProcessor(object):
         """
         Creates a `AgentCommunicator` with this `ComputationWrapper`'s
         data communication channels (training and prediction Queues). Once an
-        `AgentHelper` of some `Agent` accepts this communicator (i.e., the 
-        `AgentHelper` is created with it), the `Agent` can exchange data with 
+        `AgentHelper` of some `Agent` accepts this communicator (i.e., the
+        `AgentHelper` is created with it), the `Agent` can exchange data with
         this CW through the communicator.
         """
         self.comms[agent_id] = AgentCommunicator(

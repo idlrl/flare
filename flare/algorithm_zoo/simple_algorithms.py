@@ -37,7 +37,7 @@ class SimpleAC(Algorithm):
             next_values, next_states_update = self.model.value(next_inputs,
                                                                next_states)
             next_value = next_values["v_value"] * (
-                1 - next_episode_end["next_episode_end"])
+                1 - next_episode_end["episode_end"])
 
         assert value.size() == next_value.size()
 
@@ -137,7 +137,7 @@ class SimpleQ(Algorithm):
             next_values, next_states_update = self.ref_model.value(next_inputs,
                                                                    next_states)
             next_q_value = next_values["q_value"] * (
-                1 - next_episode_end["next_episode_end"])
+                1 - next_episode_end["episode_end"])
             next_value, _ = next_q_value.max(-1)
             next_value = next_value.unsqueeze(-1)
 
@@ -175,8 +175,7 @@ class SimpleSARSA(SimpleQ):
             next_values, next_states_update = self.model.value(next_inputs,
                                                                next_states)
             next_value = comf.idx_select(next_values["q_value"], next_action)
-            next_value = next_value * (
-                1 - next_episode_end["next_episode_end"])
+            next_value = next_value * (1 - next_episode_end["episode_end"])
 
         critic_value = reward + self.discount_factor * next_value
         cost = (critic_value - comf.idx_select(q_value, action))**2

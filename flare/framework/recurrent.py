@@ -62,7 +62,11 @@ def transpose(hier_tensors):
     return transposed
 
 
-def recurrent_group(seq_inputs, insts, init_states, step_func):
+def recurrent_group(seq_inputs,
+                    insts,
+                    init_states,
+                    step_func,
+                    out_states=False):
     """
     Strip a sequence level and apply the stripped inputs to `step_func`
     provided by the user.
@@ -142,7 +146,8 @@ def recurrent_group(seq_inputs, insts, init_states, step_func):
         states = [s[:frame_size] for s in states]
         insts = [i[:frame_size] for i in insts]
         out_frames, states = step_func(*(in_frames + insts + states))
-        #        out_frames += states
+        if out_states:
+            out_frames += states
         transposed_out_frames.append(out_frames)
 
     seq_outs = [

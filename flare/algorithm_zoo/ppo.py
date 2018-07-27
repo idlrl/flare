@@ -49,7 +49,7 @@ class PPO2(Algorithm):
             next_values, next_states_update = self.model.value(next_inputs,
                                                                next_states)
             next_value = next_values["v_value"] * (
-                1 - next_episode_end["next_episode_end"])
+                1 - next_episode_end["episode_end"])
 
         assert value.size() == next_value.size()
 

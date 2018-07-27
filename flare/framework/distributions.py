@@ -24,3 +24,6 @@ class Deterministic(Distribution):
 
     def sample(self):
         return self._param
+
+    def log_prob(self, a):
+        return torch.zeros(a.shape)

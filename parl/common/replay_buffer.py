@@ -6,28 +6,20 @@ import random
 
 
 class Experience(object):
-    def set_next_exp(self, next_exp):
-        self.next_exp = deepcopy(next_exp)
+    def __init__(self, quantities):
+        assert isinstance(quantities, dict)
+        assert "episode_end" in quantities
+        self.episode_end = quantities["episode_end"][0]
+        self.quantities = quantities
 
-    @staticmethod
-    def define(name, attrs):
-        """
-        Create an Experience 
-        """
+    def is_episode_end(self):
+        return self.episode_end
 
-        def set_attributes(self, **kwargs):
-            for k, v in kwargs.iteritems():
-                if not hasattr(self, k):
-                    raise TypeError
-                setattr(self, k, v)
+    def val(self, key):
+        return self.quantities[key]
 
-        assert isinstance(attrs, list)
-        cls_attrs = dict((attr, None) for attr in attrs)
-        cls_attrs['next_exp'] = None  # add attribute "next_exp"
-        # __init__ of the new Experience class
-        cls_attrs['__init__'] = set_attributes
-        cls = type(name, (Experience, ), cls_attrs)
-        return cls
+    def keys(self):
+        return sorted(self.quantities.keys())
 
 
 class Sample(object):
@@ -70,44 +62,39 @@ class ReplayBuffer(object):
         else:
             return (i + 1) % self.capacity
 
-    def add(self, t):
+    def add(self, e):
         """
         Store one experience into the buffer.
-
-        Args:
-            exp(Experience): the experience to store in the buffer.
         """
+        assert isinstance(
+            e, Experience), "Replay buffer only accepts Experience instances!"
         if len(self.buffer) < self.capacity:
             self.buffer.append(None)
         self.last = (self.last + 1) % self.capacity
-        self.buffer[self.last] = deepcopy(t)
+        self.buffer[self.last] = deepcopy(e)
 
-    def sample(self, num_samples, is_episode_end_f, num_seqs=0):
+    def sample(self, num_experiences, num_seqs=0):
         """
-        Generate a batch of Samples. Each Sample represents a sequence of
-        Experiences (length>=1). And a sequence must not cross the boundary
-        between two games. 
-
-        Args:
-            num_samples(int): Number of samples to generate.
-            
-        Returns: A generator of Samples
+        If num_seqs > 0, generate a batch of sequences of experiences.
+        Each sequence has a length of int(num_experiences / num_seqs).
+        A sequence must not cross the boundary between two games.
+        If num_seqs == 0, generate a batch of individual experiences.
         """
         exp_seqs = []
         if len(self.buffer) <= 1000:
             return exp_seqs
 
         if num_seqs == 0:
-            num_seqs = num_samples
+            num_seqs = num_experiences
         for _ in xrange(num_seqs):
             while True:
                 idx = np.random.randint(0, len(self.buffer) - 1)
-                if not self.buffer_end(idx) and not is_episode_end_f(
-                        self.buffer[idx]):
+                if not self.buffer_end(idx) and not self.buffer[
+                        idx].is_episode_end():
                     break
             indices = [idx]
-            for i in range(num_samples / num_seqs):
-                if self.buffer_end(idx) or is_episode_end_f(self.buffer[idx]):
+            for i in range(num_experiences / num_seqs):
+                if self.buffer_end(idx) or self.buffer[idx].is_episode_end():
                     break
                 idx = self.next_idx(idx)
                 indices.append(idx)
@@ -132,17 +119,17 @@ class NoReplacementQueue(object):
     def add(self, t):
         self.q.append(deepcopy(t))
 
-    def sample(self, is_episode_end_f):
+    def sample(self):
         exp_seqs = []
         while len(self.q) > 1:
             exps = []
-            while len(self.q) > 1 and not is_episode_end_f(self.q[0]):
+            while len(self.q) > 1 and not self.q[0].is_episode_end():
                 # no need to deepcopy here as the selected exp is immediately
                 # removed from the queue
                 exps.append(self.q.popleft())
-            if (exps):
+            if exps:
                 exps.append(deepcopy(self.q[0]))
                 exp_seqs.append(exps)
-            if is_episode_end_f(self.q[0]):
+            if self.q[0].is_episode_end():
                 self.q.popleft()
         return exp_seqs
