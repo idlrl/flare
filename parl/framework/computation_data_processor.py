@@ -1,3 +1,4 @@
+import os
 from multiprocessing import Queue
 from Queue import Empty, Full
 from threading import Thread, Lock
@@ -148,6 +149,7 @@ class ComputationDataProcessor(object):
             data = []
 
     def run(self):
+        print("CDP", self.name, os.getpid())
         self.exit_flag = False
         self.prediction_thread.start()
         self.training_thread.start()

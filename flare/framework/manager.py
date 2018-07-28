@@ -16,6 +16,8 @@ from multiprocessing import Queue
 from threading import Thread
 from flare.framework.computation_task import ComputationTask
 from parl.common.logging import GameLogger
+import signal
+import sys
 
 
 class Manager(object):
@@ -35,6 +37,20 @@ class Manager(object):
             self.CDPs[name] = self.cts[name].CDP
         self.logger = GameLogger(1, 100)
 
+    def __signal_handler(self, sig, frame):
+        # this is still not good, as we don't get a chance to normally stop
+        # the processes.
+        print "user signaled ctrl+c"
+        for cdp in self.CDPs.values():
+            cdp.stop()
+        for agent in self.agents:
+            agent.running.value = 0
+            agent.join()
+
+        self.logger.running.value = False
+        self.logger.join()
+        sys.exit(0)
+
     def add_agent(self, agent):
         agent.id = len(self.agents)
         # `Agent` needs to know the state specs to prepare state data
@@ -52,6 +68,7 @@ class Manager(object):
         self.agents.pop()
 
     def start(self):
+        signal.signal(signal.SIGINT, self.__signal_handler)
         self.logger.start()
         for cdp in self.CDPs.values():
             cdp.run()

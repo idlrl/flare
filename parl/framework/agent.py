@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from multiprocessing import Process, Value
 import numpy as np
+import os
 from threading import Lock, Thread
 from parl.common.communicator import AgentCommunicator
 from parl.common.replay_buffer import NoReplacementQueue, ReplayBuffer
@@ -158,7 +159,7 @@ class ExpReplayHelper(AgentHelper):
         while self.running.value:
             with self.lock:
                 exp_seqs = self.replay_buffer.sample(
-                    self.sample_size, self.is_episode_end, self.num_seqs)
+                    self.num_samples, self.is_episode_end, self.num_seqs)
             if not exp_seqs:
                 continue
             data, size = self.unpack_func(exp_seqs)
@@ -277,6 +278,7 @@ class Agent(Process):
         """
         Entry function of Agent process.
         """
+        print("agent", self.id, os.getpid())
         self.running.value = 1
         for helper in self.helpers.itervalues():
             helper.start()
