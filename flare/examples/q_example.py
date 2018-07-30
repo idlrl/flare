@@ -63,7 +63,7 @@ if __name__ == '__main__':
             # sampling
             sample_method=ExpReplayHelper,
             buffer_capacity=100000,
-            sample_size=32,
+            num_samples=32,
             num_seqs=0,  # sample instances
             # ct wrapper
             min_agents_per_batch=1,

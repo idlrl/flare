@@ -158,7 +158,7 @@ class ExpReplayHelper(AgentHelper):
         while self.running.value:
             with self.lock:
                 exp_seqs = self.replay_buffer.sample(
-                    self.sample_size, self.is_episode_end, self.num_seqs)
+                    self.num_samples, self.is_episode_end, self.num_seqs)
             if not exp_seqs:
                 continue
             data, size = self.unpack_func(exp_seqs)
