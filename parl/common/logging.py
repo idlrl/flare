@@ -1,4 +1,3 @@
-import os
 from multiprocessing import Queue, Process, Value
 from Queue import Empty, Full
 from collections import deque
@@ -75,7 +74,6 @@ class GameLogger(Process):
             self.__flush_log()
 
     def run(self):
-        print("logger", os.getpid())
         self.running.value = True
         while self.running.value:
             try:
