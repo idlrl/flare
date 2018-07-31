@@ -110,11 +110,10 @@ class NoReplacementQueue(object):
     def __len__(self):
         return len(self.q)
 
-    def __repr__(self):
-        print '[len={0},'.format(len(self))
-        for e in self.q:
-            print '\t{0},'.format(e)
-        print ']'
+    def __str__(self):
+        content = '[len={0}, '.format(len(self))
+        content += ', '.join(str(e) for e in self.q) + ']'
+        return content
 
     def add(self, t):
         self.q.append(deepcopy(t))
