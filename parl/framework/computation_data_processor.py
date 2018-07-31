@@ -12,23 +12,10 @@ class ComputationDataProcessor(object):
     splits the batched results and sends them back to AgentHelper.
     """
 
-    def __init__(self,
-                 name,
-                 ct,
-                 agent_helper,
-                 num_agents,
-                 min_agents_per_batch=1,
-                 max_agents_per_batch=1,
-                 **kwargs):
+    def __init__(self, name, ct, agent_helper, num_agents, **kwargs):
         self.name = name
         self.ct = ct
-        self.min_agents_per_batch = min(min_agents_per_batch, num_agents)
-        self.max_agents_per_batch = min(max_agents_per_batch, num_agents)
-        # for algorithms that do not use replay, we use A2C, that is a
-        # training iteration waits for all agents' data
-        if not agent_helper.exp_replay():
-            self.min_agents_per_batch = num_agents
-            self.max_agents_per_batch = num_agents
+        self.num_agents = num_agents
         self.helper_creator = (lambda comm: agent_helper(name, comm, **kwargs))
         self.comm = CTCommunicator()
         self.comms = {}
@@ -105,7 +92,7 @@ class ComputationDataProcessor(object):
         data = []
         while not self.exit_flag:
             try:
-                while len(agent_ids) < self.min_agents_per_batch:
+                while len(agent_ids) < self.num_agents:
                     agent_id, d = self.comm.get_prediction_data()
                     agent_ids.append(agent_id)
                     data.append(d)
@@ -127,10 +114,7 @@ class ComputationDataProcessor(object):
         data = []
         while not self.exit_flag:
             try:
-                while (len(agent_ids) < self.min_agents_per_batch or
-                       len(agent_ids) >= self.min_agents_per_batch and
-                       len(agent_ids) < self.max_agents_per_batch and
-                       not self.comm.training_q.empty()):
+                while len(agent_ids) < self.num_agents:
                     agent_id, d = self.comm.get_training_data()
                     agent_ids.append(agent_id)
                     data.append(d)

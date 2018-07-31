@@ -21,7 +21,7 @@ class SimpleRLAgent(Agent):
         # sensor_inputs, (prev_)states and actions are all dict
         max_steps = self.env._max_episode_steps
         obs = self.env.reset()
-        episode_end = False
+        episode_end = 0
         r = 0
         log_entry = GameLogEntry(self.id, 'RL')
         # end before the Gym wrongly gives game_over=True for a timeout case
@@ -42,7 +42,7 @@ class SimpleRLAgent(Agent):
                 reward=[r],
                 episode_end=[episode_end])
             obs = next_obs
-            episode_end = next_episode_end
+            episode_end = int(next_episode_end)
             if episode_end:
                 break
         # we call `predict` one more time to get actions. Needed in case of
@@ -76,7 +76,7 @@ class SimpleRNNRLAgent(Agent):
         # sensor_inputs, (prev_)states and actions are all dict
         max_steps = self.env._max_episode_steps
         obs = self.env.reset()
-        episode_end = False
+        episode_end = 0
         r = 0
         log_entry = GameLogEntry(self.id, 'RL')
         state = self.init_states['RL']["state"]
@@ -100,7 +100,7 @@ class SimpleRNNRLAgent(Agent):
                 reward=[r],
                 episode_end=[episode_end])
             obs = next_obs
-            episode_end = next_episode_end
+            episode_end = int(next_episode_end)
             state = next_states["state"]
             if episode_end:
                 break

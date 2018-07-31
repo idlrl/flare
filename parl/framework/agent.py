@@ -1,7 +1,6 @@
 from abc import ABCMeta, abstractmethod
 from multiprocessing import Process, Value
 import numpy as np
-from threading import Lock, Thread
 from parl.common.communicator import AgentCommunicator
 from parl.common.replay_buffer import NoReplacementQueue, ReplayBuffer, Experience
 
@@ -24,10 +23,12 @@ class AgentHelper(object):
     """
     __metaclass__ = ABCMeta
 
-    def __init__(self, name, communicator):
+    def __init__(self, name, communicator, sample_interval):
         assert isinstance(communicator, AgentCommunicator)
         self.name = name
         self.comm = communicator
+        self.counter = 0
+        self.sample_interval = sample_interval
 
     def unpack_exps(self, exp_seqs):
         """
@@ -86,12 +87,6 @@ class AgentHelper(object):
 
         return ret, size
 
-    def start(self):
-        pass
-
-    def stop(self):
-        pass
-
     @abstractstatic
     def exp_replay():
         """
@@ -100,8 +95,7 @@ class AgentHelper(object):
         """
         pass
 
-    @abstractmethod
-    def predict(self, inputs, states):
+    def predict(self, inputs, states=dict()):
         """
         Process the input data (if necessary), send them to CDP for prediction,
         and receive the outcome.
@@ -110,6 +104,17 @@ class AgentHelper(object):
             inputs(dict): data used for prediction. It is caller's job
             to make sure inputs contains all data needed and they are in the
             right form.
+        """
+        data = dict(inputs=inputs, states=states)
+        self.comm.put_prediction_data((data, 1))
+        ret = self.comm.get_prediction_return()
+        return ret
+
+    @abstractmethod
+    def add_experience(self, e):
+        """
+        Implements how to record an experience.
+        Will be called by self.store_data()
         """
         pass
 
@@ -120,9 +125,20 @@ class AgentHelper(object):
         Args:
             data(dict): data to store.
         """
-        pass
+        t = Experience(kwargs)
+        self.add_experience(t)
+        self.counter += 1
+        if self.counter % self.sample_interval == 0:
+            self.learn()
 
     @abstractmethod
+    def sample_experiences(self):
+        """
+        Implements how to retrieve experiences from past.
+        Will be called by self.learn()
+        """
+        pass
+
     def learn(self):
         """
         Sample data from past experiences and send them to CDP for learning.
@@ -134,7 +150,12 @@ class AgentHelper(object):
         2. In store_data(), e.g., learning once every few steps
         3. As a separate thread, e.g., using experience replay
         """
-        pass
+        exp_seqs = self.sample_experiences()
+        if not exp_seqs:
+            return
+        data, size = self.unpack_exps(exp_seqs)
+        self.comm.put_training_data((data, size))
+        ret = self.comm.get_training_return()
 
 
 class OnPolicyHelper(AgentHelper):
@@ -145,37 +166,21 @@ class OnPolicyHelper(AgentHelper):
     While waiting for learning return, the calling `Agent` is blocked.
     """
 
-    def __init__(self, name, communicator, sample_interval=5,
-                 sample_seq=False):
-        super(OnPolicyHelper, self).__init__(name, communicator)
-        self.sample_interval = sample_interval
+    def __init__(self, name, communicator, sample_interval=5):
+        super(OnPolicyHelper, self).__init__(name, communicator,
+                                             sample_interval)
         # NoReplacementQueue used to store past experience.
         self.exp_queue = NoReplacementQueue()
-        self.counter = 0
 
     @staticmethod
     def exp_replay():
         return False
 
-    def predict(self, inputs, states=dict()):
-        data = dict(inputs=inputs, states=states)
-        self.comm.put_prediction_data((data, 1))
-        ret = self.comm.get_prediction_return()
-        return ret
+    def add_experience(self, e):
+        self.exp_queue.add(e)
 
-    def store_data(self, **kwargs):
-        t = Experience(kwargs)
-        self.exp_queue.add(t)
-        self.counter += 1
-        if self.counter % self.sample_interval == 0:
-            self.learn()
-            self.counter = 0
-
-    def learn(self):
-        exp_seqs = self.exp_queue.sample()
-        data, size = self.unpack_exps(exp_seqs)
-        self.comm.put_training_data((data, size))
-        self.comm.get_training_return()
+    def sample_experiences(self):
+        return self.exp_queue.sample()
 
 
 class ExpReplayHelper(AgentHelper):
@@ -189,57 +194,24 @@ class ExpReplayHelper(AgentHelper):
                  communicator,
                  buffer_capacity,
                  num_experiences,
+                 sample_interval=5,
                  num_seqs=1):
-        super(ExpReplayHelper, self).__init__(name, communicator)
+        super(ExpReplayHelper, self).__init__(name, communicator,
+                                              sample_interval)
         # replay buffer for experience replay
         self.replay_buffer = ReplayBuffer(buffer_capacity)
         self.num_experiences = num_experiences
         self.num_seqs = num_seqs
-        # the thread that will run learn()
-        self.learning_thread = Thread(target=self.learn)
-        # prevent race on the replay_buffer
-        self.lock = Lock()
-        # flag to signal learning_thread to stop
-        self.running = Value('i', 0)
 
     @staticmethod
     def exp_replay():
         return True
 
-    def start(self):
-        self.running.value = 1
-        self.learning_thread.start()
+    def add_experience(self, e):
+        self.replay_buffer.add(e)
 
-    def stop(self):
-        self.running.value = 0
-        self.learning_thread.join()
-
-    def predict(self, inputs, states=dict()):
-        data = dict(inputs=inputs, states=states)
-        self.comm.put_prediction_data((data, 1))
-        ret = self.comm.get_prediction_return()
-        return ret
-
-    def store_data(self, **kwargs):
-        t = Experience(kwargs)
-        with self.lock:
-            self.replay_buffer.add(t)
-
-    def learn(self):
-        """
-        This function should be invoked in a separate thread. Once called, it
-        keeps sampling data from the replay buffer until exit_flag is signaled.
-        """
-        # keep running until exit_flag is signaled
-        while self.running.value:
-            with self.lock:
-                exp_seqs = self.replay_buffer.sample(self.num_experiences,
-                                                     self.num_seqs)
-            if not exp_seqs:
-                continue
-            data, size = self.unpack_exps(exp_seqs)
-            self.comm.put_training_data((data, size))
-            ret = self.comm.get_training_return()
+    def sample_experiences(self):
+        return self.replay_buffer.sample(self.num_experiences, self.num_seqs)
 
 
 class Agent(Process):
@@ -318,12 +290,8 @@ class Agent(Process):
         Default entry function of Agent process.
         """
         self.running.value = 1
-        for helper in self.helpers.itervalues():
-            helper.start()
         for i in range(self.num_games):
             self._run_one_episode()
             if not self.running.value:
                 return
         self.running.value = 0
-        for helper in self.helpers.itervalues():
-            helper.stop()

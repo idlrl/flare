@@ -26,7 +26,7 @@ if __name__ == '__main__':
     """
     game = "MountainCar-v0"
 
-    num_agents = 8
+    num_agents = 16
     num_games = 8000
     # 1. Create environments
     envs = []
@@ -49,7 +49,7 @@ if __name__ == '__main__':
             dims=state_shape,
             num_actions=num_actions,
             mlp=nn.Sequential(mlp, nn.Linear(inner_size, num_actions))),
-        exploration_end_steps=200000,
+        exploration_end_steps=500000 / num_agents,
         update_ref_interval=100)
 
     # 3. Specify the settings for learning: the algorithm to use (SimpleAC
@@ -62,12 +62,10 @@ if __name__ == '__main__':
             hyperparas=dict(lr=1e-4),
             # sampling
             agent_helper=ExpReplayHelper,
-            buffer_capacity=100000,
-            num_experiences=32,
+            buffer_capacity=200000 / num_agents,
+            num_experiences=4,  # num per agent
             num_seqs=0,  # sample instances
-            # ct wrapper
-            min_agents_per_batch=1,
-            max_agents_per_batch=8)
+            sample_interval=8)
     }
 
     # 4. Create Manager that handles the running of the whole framework
