@@ -9,6 +9,7 @@ import torch.nn as nn
 import unittest
 import math
 import gym
+import glog
 
 
 def unpack_exps(exps):
@@ -102,7 +103,7 @@ class TestGymGame(unittest.TestCase):
                     exploration_end_steps=500000,
                     update_ref_interval=100)
 
-            print "algorithm: " + alg.__class__.__name__
+            glog.info("algorithm: " + alg.__class__.__name__)
 
             ct = ComputationTask("RL", algorithm=alg, hyperparas=dict(lr=1e-4))
             batch_size = 32
@@ -172,7 +173,7 @@ class TestGymGame(unittest.TestCase):
                     game_over = int(next_is_over)
 
                 if n % 50 == 0:
-                    print("episode reward: %f" % episode_reward)
+                    glog.info("episode reward: %f" % episode_reward)
 
                 average_episode_reward.append(episode_reward)
                 if len(average_episode_reward) > 20:
@@ -181,7 +182,8 @@ class TestGymGame(unittest.TestCase):
                 ### once hit the threshold, we don't bother running
                 if sum(average_episode_reward) / len(
                         average_episode_reward) > threshold:
-                    print "Test terminates early due to threshold satisfied!"
+                    glog.info(
+                        "Test terminates early due to threshold satisfied!")
                     break
 
             ### compuare the average episode reward to reduce variance

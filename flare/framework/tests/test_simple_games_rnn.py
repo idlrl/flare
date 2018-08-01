@@ -6,6 +6,7 @@ import torch.nn as nn
 import unittest
 import math
 import gym
+import glog
 
 
 def unpack_exps_seqs(exps_seqs):
@@ -69,7 +70,7 @@ class TestGymGame(unittest.TestCase):
                 exploration_end_steps=esteps,
                 update_ref_interval=100 * batch_size / num_seqs, )
 
-            print "algorithm: " + alg.__class__.__name__
+            glog.info("algorithm: " + alg.__class__.__name__)
 
             ct = ComputationTask(
                 "RNNRL", algorithm=alg, hyperparas=dict(lr=1e-4))
@@ -129,7 +130,7 @@ class TestGymGame(unittest.TestCase):
                         break
 
                 if n % 50 == 0:
-                    print("episode reward: %f" % episode_reward)
+                    glog.info("episode reward: %f" % episode_reward)
 
                 average_episode_reward.append(episode_reward)
                 if len(average_episode_reward) > 20:

@@ -1,6 +1,7 @@
+import glog
+from collections import deque
 from multiprocessing import Queue, Process, Value
 from Queue import Empty, Full
-from collections import deque
 
 
 class Statistics(object):
@@ -11,9 +12,9 @@ class Statistics(object):
         self.num_games = 0
 
     def __repr__(self):
-        str = '[num_games={0}\n'.format(self.num_games)
+        str = '[\n    num_games={0}\n'.format(self.num_games)
         for k in self.keys:
-            str += '\t{0} [total: {1}, average@{2}: {3}]\n'.format(
+            str += '    {0} [total: {1}, average@{2}: {3}]\n'.format(
                 k, self.total[k],
                 len(self.data_q[k]),
                 sum(self.data_q[k]) / float(len(self.data_q[k])))
@@ -63,7 +64,7 @@ class GameLogger(Process):
 
     def __flush_log(self):
         for alg_name, stats in self.stats.iteritems():
-            print '{0}:\n{1}'.format(alg_name, stats)
+            glog.info('\n{0}:{1}'.format(alg_name, stats))
 
     def __process_log(self, log):
         if not log.alg_name in self.stats:
