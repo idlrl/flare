@@ -34,7 +34,7 @@ class SuccessorRepresentationQ(SimpleQ):
 
         self.reward_cost_weight = reward_cost_weight
 
-    def learn(self, inputs, next_inputs, states, next_states, next_episode_end,
+    def learn(self, inputs, next_inputs, states, next_states, next_alive,
               actions, next_actions, rewards):
         """
         We keep predict() the same with SimpleQ.
@@ -83,8 +83,7 @@ class SuccessorRepresentationQ(SimpleQ):
                 dim=1,
                 index=next_action.unsqueeze(-1).expand(-1, -1,
                                                        state_embedding_dim))
-            next_sr = next_sr.squeeze(1) * (
-                1 - next_episode_end["episode_end"])
+            next_sr = next_sr.squeeze(1) * torch.abs(next_alive["alive"])
 
         sr_cost = (
             next_state_embedding.detach() + self.discount_factor * next_sr - sr

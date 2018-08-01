@@ -8,12 +8,12 @@ import random
 class Experience(object):
     def __init__(self, quantities):
         assert isinstance(quantities, dict)
-        assert "episode_end" in quantities
-        self.episode_end = quantities["episode_end"][0]
+        assert "alive" in quantities
+        self.alive = quantities["alive"][0]
         self.quantities = quantities
 
     def is_episode_end(self):
-        return self.episode_end
+        return self.alive <= 0
 
     def val(self, key):
         return self.quantities[key]

@@ -47,7 +47,7 @@ class AgentHelper(object):
         ret = dict(
             inputs={},
             next_inputs={},
-            next_episode_end={},
+            next_alive={},
             rewards={},
             actions={},
             next_actions={},
@@ -76,8 +76,8 @@ class AgentHelper(object):
                 extract_key(exp_seq[1:2], k)[0] for exp_seq in exp_seqs
             ]
 
-        ret["next_episode_end"]["episode_end"] \
-            = [extract_key(exp_seq[1:], "episode_end") for exp_seq in exp_seqs]
+        ret["next_alive"]["alive"] \
+            = [extract_key(exp_seq[1:], "alive") for exp_seq in exp_seqs]
 
         if not self.state_keys:  # sample instances
             for k in ret.keys():
