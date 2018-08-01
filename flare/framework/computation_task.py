@@ -43,6 +43,15 @@ class ComputationTask(object):
     def get_state_specs(self):
         return self.alg.get_state_specs()
 
+    def get_input_specs(self):
+        return self.alg.get_input_specs()
+
+    def get_action_specs(self):
+        return self.alg.get_action_specs()
+
+    def get_reward_specs(self):
+        return self.alg.get_reward_specs()
+
     @property
     def CDP(self):
         if self._cdp is None:
@@ -99,8 +108,6 @@ class ComputationTask(object):
         action_names = sorted(
             [name for name, _ in self.alg.get_action_specs()])
         state_names = sorted([name for name, _ in self.alg.get_state_specs()])
-        assert sorted(pred_actions.keys()) == action_names
-        assert sorted(pred_states.keys()) == state_names
         return pred_actions, pred_states
 
     def learn(self,
@@ -125,7 +132,7 @@ class ComputationTask(object):
         next_states = self._create_tensors(next_states,
                                            self.alg.get_state_specs())
         next_episode_end = self._create_tensors(
-            next_episode_end, [("next_episode_end", dict(shape=[1]))])
+            next_episode_end, [("episode_end", dict(shape=[1]))])
         actions = self._create_tensors(actions, self.alg.get_action_specs())
         next_actions = self._create_tensors(next_actions,
                                             self.alg.get_action_specs())

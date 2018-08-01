@@ -45,15 +45,15 @@ if __name__ == '__main__':
     alg = SimpleAC(model=SimpleRNNModelAC(
         dims=state_shape, num_actions=num_actions, mlp=mlp))
 
-    # 3. Specify the settings for learning: the algorithm to use (SimpleAC 
-    # in this case), data sampling strategy (OnPolicyHelper here) and other 
+    # 3. Specify the settings for learning: the algorithm to use (SimpleAC
+    # in this case), data sampling strategy (OnPolicyHelper here) and other
     # settings used by ComputationTask.
     ct_settings = {
         "RL": dict(
             algorithm=alg,
             hyperparas=dict(lr=1e-4),
             # sampling
-            sample_method=OnPolicyHelper,
+            agent_helper=OnPolicyHelper,
             sample_interval=8,
             num_agents=num_agents)
     }
@@ -61,8 +61,8 @@ if __name__ == '__main__':
     # 4. Create Manager that handles the running of the whole framework
     manager = Manager(ct_settings)
 
-    # 5. Spawn one agent for each instance of environment. 
-    #    Agent's behavior depends on the actual algorithm being used. Since we 
+    # 5. Spawn one agent for each instance of environment.
+    #    Agent's behavior depends on the actual algorithm being used. Since we
     #    are using SimpleAC, a proper type of Agent is SimpleRLAgent.
     for env in envs:
         agent = SimpleRNNRLAgent(env, num_games)

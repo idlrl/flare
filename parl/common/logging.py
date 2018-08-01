@@ -8,10 +8,10 @@ class Statistics(object):
         self.keys = keys
         self.total = {k: 0 for k in keys}
         self.data_q = {k: deque(maxlen=moving_window) for k in keys}
-        self.count = 0
+        self.num_games = 0
 
     def __repr__(self):
-        str = '[counts={0}\n'.format(self.count)
+        str = '[num_games={0}\n'.format(self.num_games)
         for k in self.keys:
             str += '\t{0} [total: {1}, average@{2}: {3}]\n'.format(
                 k, self.total[k],
@@ -25,14 +25,14 @@ class Statistics(object):
             v = getattr(log, k)
             self.total[k] += v
             self.data_q[k].append(v)
-        self.count += 1
+        self.num_games += 1
 
     def record_logs(self, logs):
         for k in self.keys:
             D = [getattr(l, k) for l in logs]
             self.total[k] = sum(D)
             self.data_q[k].extend(D)
-        self.count += len(D)
+        self.num_games += len(D)
 
 
 class GameLogEntry(object):

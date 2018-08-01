@@ -24,16 +24,14 @@ class Manager(object):
     def __init__(self, ct_settings):
         """
             Initialize `Manager`. `ct_settings` is used to create
-            `ComputationTask`; The parameters in `ct_settings` are for each 
+            `ComputationTask`; The parameters in `ct_settings` are for each
             `ComputationTask`.
         """
         self.agents = []
         self.cts = {}
-        self.state_specs = {}
         self.CDPs = {}
         for name, setting in ct_settings.iteritems():
             self.cts[name] = ComputationTask(name, **setting)
-            self.state_specs[name] = self.cts[name].get_state_specs()
             self.CDPs[name] = self.cts[name].CDP
         self.logger = GameLogger(1, 100)
 
@@ -54,12 +52,17 @@ class Manager(object):
     def add_agent(self, agent):
         agent.id = len(self.agents)
         # `Agent` needs to know the state specs to prepare state data
-        agent.make_initial_states(self.state_specs)
+        agent.make_initial_states(
+            {k: v.get_state_specs()
+             for k, v in self.cts.iteritems()})
         self.agents.append(agent)
         for name, cdp in self.CDPs.iteritems():
             agent.add_agent_helper(
-                cdp.create_agent_helper(agent.id), agent.pack_exps,
-                agent.unpack_exp_seqs, agent.is_episode_end)
+                cdp.create_agent_helper(agent.id),
+                [s[0] for s in self.cts[name].get_input_specs()],
+                [s[0] for s in self.cts[name].get_action_specs()],
+                [s[0] for s in self.cts[name].get_state_specs()],
+                [s[0] for s in self.cts[name].get_reward_specs()])
             agent.log_q = self.logger.log_q
 
     def remove_agent(self):

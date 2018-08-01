@@ -1,50 +1,120 @@
 from abc import ABCMeta, abstractmethod
 from multiprocessing import Process, Value
 import numpy as np
-from threading import Lock, Thread
 from parl.common.communicator import AgentCommunicator
-from parl.common.replay_buffer import NoReplacementQueue, ReplayBuffer
+from parl.common.replay_buffer import NoReplacementQueue, ReplayBuffer, Experience
+
+
+class abstractstatic(staticmethod):
+    __slots__ = ()
+
+    def __init__(self, function):
+        super(abstractstatic, self).__init__(function)
+        function.__isabstractmethod__ = True
+
+    __isabstractmethod__ = True
 
 
 class AgentHelper(object):
     """
-    AgentHelper abstracts some part of Agent's data processing and the I/O 
+    AgentHelper abstracts some part of Agent's data processing and the I/O
     communication between Agent and ComputationDataProcessor (CP). It receives a
     Communicator from one CDP and uses it to send data to the CDP.
     """
     __metaclass__ = ABCMeta
 
-    __on_policy = False
-
-    def __init__(self, name, on_policy, communicator):
+    def __init__(self, name, communicator, sample_interval):
         assert isinstance(communicator, AgentCommunicator)
         self.name = name
-        self.__on_policy = on_policy
         self.comm = communicator
-        self.pack_func = None
-        self.unpack_func = None
-        self.is_episode_end = None
+        self.counter = 0
+        self.sample_interval = sample_interval
 
-    def start(self):
+    def unpack_exps(self, exp_seqs):
+        """
+        The input `exp_seqs` is always a list of sequences, each sequence
+        containing multiple Experience instances.
+        """
+
+        def concat_lists(lists):
+            return [x for l in lists for x in l]
+
+        def extract_key(seq, k):
+            assert seq
+            return [e.val(k) for e in seq]
+
+        size = sum([len(exp_seq) - 1 for exp_seq in exp_seqs])
+        ret = dict(
+            inputs={},
+            next_inputs={},
+            next_episode_end={},
+            rewards={},
+            actions={},
+            next_actions={},
+            states=None,
+            next_states=None)
+
+        for k in self.input_keys:
+            ipt_seqs = [extract_key(exp_seq, k) for exp_seq in exp_seqs]
+            ret["inputs"][k] = [ipt_seq[:-1] for ipt_seq in ipt_seqs]
+            ret["next_inputs"][k] = [ipt_seq[1:] for ipt_seq in ipt_seqs]
+
+        for k in self.action_keys:
+            act_seqs = [extract_key(exp_seq, k) for exp_seq in exp_seqs]
+            ret["actions"][k] = [act_seq[:-1] for act_seq in act_seqs]
+            ret["next_actions"][k] = [act_seq[1:] for act_seq in act_seqs]
+
+        for k in self.reward_keys:
+            ret["rewards"][
+                k] = [extract_key(exp_seq[:-1], k) for exp_seq in exp_seqs]
+
+        for k in self.state_keys:
+            ## we only take the first/second element of a seq
+            ret["states"][
+                k] = [extract_key(exp_seq[:1], k)[0] for exp_seq in exp_seqs]
+            ret["next_states"][k] = [
+                extract_key(exp_seq[1:2], k)[0] for exp_seq in exp_seqs
+            ]
+
+        ret["next_episode_end"]["episode_end"] \
+            = [extract_key(exp_seq[1:], "episode_end") for exp_seq in exp_seqs]
+
+        if not self.state_keys:  # sample instances
+            for k in ret.keys():
+                if ret[k] is not None:
+                    for kk in ret[k].keys():
+                        ret[k][kk] = concat_lists(ret[k][kk])
+
+        return ret, size
+
+    @abstractstatic
+    def exp_replay():
+        """
+        Return a bool value indicating whether the helper requires experience
+        replay or not.
+        """
         pass
 
-    def stop(self):
-        pass
-
-    @classmethod
-    def on_policy(cls):
-        return self.__on_policy
-
-    @abstractmethod
-    def predict(self, inputs, states):
+    def predict(self, inputs, states=dict()):
         """
         Process the input data (if necessary), send them to CDP for prediction,
         and receive the outcome.
 
         Args:
-            inputs(dict): data used for prediction. It is caller's job 
-            to make sure inputs contains all data needed and they are in the 
+            inputs(dict): data used for prediction. It is caller's job
+            to make sure inputs contains all data needed and they are in the
             right form.
+        """
+        data = dict(inputs=inputs, states=states)
+        self.comm.put_prediction_data((data, 1))
+        ret = self.comm.get_prediction_return()
+        return ret
+
+    @abstractmethod
+    def add_experience(self, e):
+        """
+        Implements how to record an experience.
+        Will be called by self.store_data()
         """
         pass
 
@@ -53,15 +123,26 @@ class AgentHelper(object):
         Store the past experience for later use, e.g., experience replay.
 
         Args:
-            data(dict): data to store. 
+            data(dict): data to store.
+        """
+        t = Experience(kwargs)
+        self.add_experience(t)
+        self.counter += 1
+        if self.counter % self.sample_interval == 0:
+            self.learn()
+
+    @abstractmethod
+    def sample_experiences(self):
+        """
+        Implements how to retrieve experiences from past.
+        Will be called by self.learn()
         """
         pass
 
-    @abstractmethod
     def learn(self):
         """
-        Sample data from past experiences and send them to CDP for learning. 
-        Optionally, it receives learning outcomes sent back from CW and does 
+        Sample data from past experiences and send them to CDP for learning.
+        Optionally, it receives learning outcomes sent back from CW and does
         some processing.
 
         Depends on users' need, this function can be called in three ways:
@@ -69,7 +150,12 @@ class AgentHelper(object):
         2. In store_data(), e.g., learning once every few steps
         3. As a separate thread, e.g., using experience replay
         """
-        pass
+        exp_seqs = self.sample_experiences()
+        if not exp_seqs:
+            return
+        data, size = self.unpack_exps(exp_seqs)
+        self.comm.put_training_data((data, size))
+        ret = self.comm.get_training_return()
 
 
 class OnPolicyHelper(AgentHelper):
@@ -80,34 +166,21 @@ class OnPolicyHelper(AgentHelper):
     While waiting for learning return, the calling `Agent` is blocked.
     """
 
-    def __init__(self, name, communicator, sample_interval=5,
-                 sample_seq=False):
-        super(OnPolicyHelper, self).__init__(name, True, communicator)
-        self.sample_interval = sample_interval
+    def __init__(self, name, communicator, sample_interval=5):
+        super(OnPolicyHelper, self).__init__(name, communicator,
+                                             sample_interval)
         # NoReplacementQueue used to store past experience.
-        # TODO: support sequence sampling 
         self.exp_queue = NoReplacementQueue()
-        self.counter = 0
 
-    def predict(self, inputs, states=dict()):
-        data = dict(inputs=inputs, states=states)
-        self.comm.put_prediction_data((data, 1))
-        ret = self.comm.get_prediction_return()
-        return ret
+    @staticmethod
+    def exp_replay():
+        return False
 
-    def store_data(self, **kwargs):
-        t = self.pack_func(**kwargs)
-        self.exp_queue.add(t)
-        self.counter += 1
-        if self.counter % self.sample_interval == 0:
-            self.learn()
-            self.counter = 0
+    def add_experience(self, e):
+        self.exp_queue.add(e)
 
-    def learn(self):
-        exp_seqs = self.exp_queue.sample(self.is_episode_end)
-        data, size = self.unpack_func(exp_seqs)
-        self.comm.put_training_data((data, size))
-        self.comm.get_training_return()
+    def sample_experiences(self):
+        return self.exp_queue.sample()
 
 
 class ExpReplayHelper(AgentHelper):
@@ -116,66 +189,41 @@ class ExpReplayHelper(AgentHelper):
     run learn().
     """
 
-    def __init__(self, name, communicator, buffer_capacity, num_samples,
-                 num_seqs):
-        super(ExpReplayHelper, self).__init__(name, False, communicator)
+    def __init__(self,
+                 name,
+                 communicator,
+                 buffer_capacity,
+                 num_experiences,
+                 sample_interval=5,
+                 num_seqs=1):
+        super(ExpReplayHelper, self).__init__(name, communicator,
+                                              sample_interval)
         # replay buffer for experience replay
         self.replay_buffer = ReplayBuffer(buffer_capacity)
-        self.num_samples = num_samples
+        self.num_experiences = num_experiences
         self.num_seqs = num_seqs
-        # the thread that will run learn()
-        self.learning_thread = Thread(target=self.learn)
-        # prevent race on the replay_buffer
-        self.lock = Lock()
-        # flag to signal learning_thread to stop
-        self.running = Value('i', 0)
 
-    def start(self):
-        self.running.value = 1
-        self.learning_thread.start()
+    @staticmethod
+    def exp_replay():
+        return True
 
-    def stop(self):
-        self.running.value = 0
-        self.learning_thread.join()
+    def add_experience(self, e):
+        self.replay_buffer.add(e)
 
-    def predict(self, inputs, states=dict()):
-        data = dict(inputs=inputs, states=states)
-        self.comm.put_prediction_data((data, 1))
-        ret = self.comm.get_prediction_return()
-        return ret
-
-    def store_data(self, **kwargs):
-        t = self.pack_func(**kwargs)
-        with self.lock:
-            self.replay_buffer.add(t)
-
-    def learn(self):
-        """
-        This function should be invoked in a separate thread. Once called, it
-        keeps sampling data from the replay buffer until exit_flag is signaled.
-        """
-        # keep running until exit_flag is signaled
-        while self.running.value:
-            with self.lock:
-                exp_seqs = self.replay_buffer.sample(
-                    self.num_samples, self.is_episode_end, self.num_seqs)
-            if not exp_seqs:
-                continue
-            data, size = self.unpack_func(exp_seqs)
-            self.comm.put_training_data((data, size))
-            ret = self.comm.get_training_return()
+    def sample_experiences(self):
+        return self.replay_buffer.sample(self.num_experiences, self.num_seqs)
 
 
 class Agent(Process):
     """
-    Agent implements the control flow and logics of how Robot interacts with 
+    Agent implements the control flow and logics of how Robot interacts with
     the environment and does computation. It is a subclass of Process. The entry
     function of the Agent process is run().
 
     Agent has the following members:
     env: the environment
     num_games:  number of games to run
-    helpers:    a dictionary of `AgentHelper`, each corresponds to one 
+    helpers:    a dictionary of `AgentHelper`, each corresponds to one
                 `ComputationTask`
     log_q:      communication channel between `Agent` and the centralized logger
     running:    the `Agetn` will keep running as long as `running` is True.
@@ -193,18 +241,17 @@ class Agent(Process):
         self.running = Value('i', 0)
         self.daemon = True
 
-    def add_agent_helper(self, helper, pack_f, unpack_f, is_episode_end_f):
+    def add_agent_helper(self, helper, input_keys, action_keys, state_keys,
+                         reward_keys):
         """
         Add an AgentHelper, with its name (also the name of its
         correspoding `ComputationTask`) as key.
         """
         assert isinstance(helper, AgentHelper)
-        assert callable(pack_f)
-        assert callable(unpack_f)
-        assert callable(is_episode_end_f)
-        helper.pack_func = pack_f
-        helper.unpack_func = unpack_f
-        helper.is_episode_end = is_episode_end_f
+        helper.input_keys = input_keys
+        helper.action_keys = action_keys
+        helper.state_keys = state_keys
+        helper.reward_keys = reward_keys
         self.helpers[helper.name] = helper
 
     def make_initial_states(self, specs_dict):
@@ -216,41 +263,6 @@ class Agent(Process):
                 states[specs[0]] = np.zeros([1] + specs[1]["shape"]).astype(
                     dtype)
             self.init_states[alg_name] = states
-        return self.init_states
-
-    @abstractmethod
-    def pack_exps(cls, **kwargs):
-        """
-        Process the experience data before storing them. This function will be
-        given to `AgentHelper` as its attribute and called from `store_data`.
-
-        User should implement this class method to accommodate their needs.
-        """
-        pass
-
-    @abstractmethod
-    def unpack_exp_seqs(cls, **kwargs):
-        """
-        Process the experience data before sending them for learning. This 
-        function will be given to `AgentHelper` as its attribute and called from
-        `learn`.
-
-        User should implement this class method to accommodate their needs.
-        """
-
-        pass
-
-    @abstractmethod
-    def is_episode_end(cls, t):
-        """
-        Given an experience, return True if it represents episode end.
-
-        User should implement this class method based on the content of `t`.
-
-        Args:
-            t: experience data of one time step. It can be any type.
-        """
-        pass
 
     @abstractmethod
     def _run_one_episode(self):
@@ -258,7 +270,7 @@ class Agent(Process):
         This function implements the control flow of running one episode, which
         includes:
         1. The interaction with the environment
-        2. Calls AgentHelper's interfaces to process the data 
+        2. Calls AgentHelper's interfaces to process the data
         """
         pass
 
@@ -275,15 +287,11 @@ class Agent(Process):
 
     def run(self):
         """
-        Entry function of Agent process.
+        Default entry function of Agent process.
         """
         self.running.value = 1
-        for helper in self.helpers.itervalues():
-            helper.start()
         for i in range(self.num_games):
             self._run_one_episode()
             if not self.running.value:
                 return
         self.running.value = 0
-        for helper in self.helpers.itervalues():
-            helper.stop()

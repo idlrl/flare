@@ -117,7 +117,7 @@ class TestGymGame(unittest.TestCase):
                             next_inputs=dict(sensor=list(
                                 next_sensor)),  ## one more level for seq
                             next_states=dict(state=next_states),
-                            next_episode_end=dict(next_episode_end=list(
+                            next_episode_end=dict(episode_end=list(
                                 next_episode_end)),  ## one more level for seq
                             actions=dict(action=list(action)),
                             rewards=dict(reward=list(reward)))

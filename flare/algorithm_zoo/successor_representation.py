@@ -84,7 +84,7 @@ class SuccessorRepresentationQ(SimpleQ):
                 index=next_action.unsqueeze(-1).expand(-1, -1,
                                                        state_embedding_dim))
             next_sr = next_sr.squeeze(1) * (
-                1 - next_episode_end["next_episode_end"])
+                1 - next_episode_end["episode_end"])
 
         sr_cost = (
             next_state_embedding.detach() + self.discount_factor * next_sr - sr

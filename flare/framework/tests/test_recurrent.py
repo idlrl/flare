@@ -89,8 +89,10 @@ class TestRecurrentGroup(unittest.TestCase):
             out2 = sentence + image.mean(-1).unsqueeze(-1) + mean_state
             return [out1, out2], [state * -1]
 
-        outs = rc.recurrent_group([sentence_tensors, image_tensors], [],
-                                  [state_tensors], step_func)
+        outs = rc.recurrent_group(
+            [sentence_tensors, image_tensors], [], [state_tensors],
+            step_func,
+            out_states=True)
 
         self.assertTrue(
             tensor_lists_equal(
@@ -159,7 +161,8 @@ class TestRecurrentGroup(unittest.TestCase):
                 seq_inputs=[sentence],
                 insts=[],
                 init_states=[word_state],
-                step_func=inner_step_func)
+                step_func=inner_step_func,
+                out_states=True)
 
             last_outputs = torch.stack([o[-1] for o in outputs])
             last_word_states = torch.stack([s[-1] for s in word_states])
@@ -173,7 +176,8 @@ class TestRecurrentGroup(unittest.TestCase):
                                  insts=[],
                                  init_states=[sentence_state_tensors,
                                               word_state_tensors],
-                                 step_func=step_func)
+                                 step_func=step_func,
+                                 out_states=True)
         self.assertTrue(
             tensor_lists_equal(outs, [
                 torch.tensor([[-3.0, -6.0, -9.0, -12.0], [2.4, 4.8, 7.2, 9.6]
