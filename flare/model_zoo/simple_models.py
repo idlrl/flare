@@ -16,11 +16,11 @@ class SimpleModelDeterministic(Model):
         return [("sensor", dict(shape=[self.dims]))]
 
     def get_action_specs(self):
-        return [("action", dict(shape=[self.dims]))]
+        return [("continuous_action", dict(shape=[self.dims]))]
 
     def policy(self, inputs, states):
         hidden = self.mlp(inputs.values()[0])
-        return dict(action=Deterministic(hidden)), states
+        return dict(continuous_action=Deterministic(hidden)), states
 
 
 class SimpleModelAC(Model):
