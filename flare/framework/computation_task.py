@@ -113,7 +113,7 @@ class ComputationTask(object):
     def learn(self,
               inputs,
               next_inputs,
-              next_episode_end,
+              next_alive,
               rewards,
               actions,
               next_actions=None,
@@ -131,8 +131,8 @@ class ComputationTask(object):
         states = self._create_tensors(states, self.alg.get_state_specs())
         next_states = self._create_tensors(next_states,
                                            self.alg.get_state_specs())
-        next_episode_end = self._create_tensors(
-            next_episode_end, [("episode_end", dict(shape=[1]))])
+        next_alive = self._create_tensors(
+            next_alive, [("alive", dict(shape=[1]))])
         actions = self._create_tensors(actions, self.alg.get_action_specs())
         next_actions = self._create_tensors(next_actions,
                                             self.alg.get_action_specs())
@@ -153,10 +153,9 @@ class ComputationTask(object):
                 def outermost_step(*args):
                     ipts, nipts, nee, act, nact, rs, sts, nsts = split_list(
                         list(args), [
-                            len(inputs), len(next_inputs),
-                            len(next_episode_end), len(actions),
-                            len(next_actions), len(rewards), len(states),
-                            len(next_states)
+                            len(inputs), len(next_inputs), len(next_alive),
+                            len(actions), len(next_actions), len(rewards),
+                            len(states), len(next_states)
                         ])
                     ## We wrap each input into a dictionary because self.alg.learn
                     ## is expected to receive dicts and output dicts
@@ -165,7 +164,7 @@ class ComputationTask(object):
                         dict(zip(next_inputs.keys(), nipts)),
                         dict(zip(states.keys(), sts)),
                         dict(zip(next_states.keys(), nsts)),
-                        dict(zip(next_episode_end.keys(), nee)),
+                        dict(zip(next_alive.keys(), nee)),
                         dict(zip(actions.keys(), act)),
                         dict(zip(next_actions.keys(), nact)),
                         dict(zip(rewards.keys(), rs)))
@@ -176,7 +175,7 @@ class ComputationTask(object):
 
                 costs = rc.recurrent_group(seq_inputs=inputs.values() + \
                                                  next_inputs.values() + \
-                                                 next_episode_end.values() + \
+                                                 next_alive.values() + \
                                                  actions.values() + \
                                                  next_actions.values() + \
                                                  rewards.values(),
@@ -186,8 +185,8 @@ class ComputationTask(object):
                 costs = dict(zip(self.cost_keys, costs))
             else:
                 costs, _, _ = self.alg.learn(inputs, next_inputs, states,
-                                             next_states, next_episode_end,
-                                             actions, next_actions, rewards)
+                                             next_states, next_alive, actions,
+                                             next_actions, rewards)
 
             ### backward and step
             total_cost, total = sum_cost(costs["cost"])

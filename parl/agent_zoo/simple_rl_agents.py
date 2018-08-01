@@ -21,7 +21,7 @@ class SimpleRLAgent(Agent):
         # sensor_inputs, (prev_)states and actions are all dict
         max_steps = self.env._max_episode_steps
         obs = self.env.reset()
-        episode_end = 0
+        alive = 1
         r = 0
         log_entry = GameLogEntry(self.id, 'RL')
         # end before the Gym wrongly gives game_over=True for a timeout case
@@ -30,21 +30,21 @@ class SimpleRLAgent(Agent):
             actions, _ = self.predict(
                 'RL', inputs=dict(sensor=np.array([obs]).astype("float32")))
             a = actions["action"][0]
-            next_obs, r, next_episode_end, _ = self.env.step(a[0])
+            next_obs, r, next_game_over, _ = self.env.step(a[0])
             r /= 100.0
 
             log_entry.num_steps += 1
             log_entry.total_reward += r
             self.store_data(
-                'RL',
-                sensor=obs,
-                action=a,
-                reward=[r],
-                episode_end=[episode_end])
+                'RL', sensor=obs, action=a, reward=[r], alive=[alive])
             obs = next_obs
-            episode_end = int(next_episode_end)
-            if episode_end:
+            alive = 1 - int(next_game_over)
+            if not alive:
                 break
+
+        if alive:  ## timeout
+            alive = -1
+
         # we call `predict` one more time to get actions. Needed in case of
         # non-episode-end ending.
         actions, _ = self.predict(
@@ -54,7 +54,7 @@ class SimpleRLAgent(Agent):
             sensor=obs,
             action=actions["action"][0],
             reward=[0],
-            episode_end=[episode_end])
+            alive=[alive])
         self.log_q.put(log_entry)
         return log_entry.total_reward
 
@@ -76,7 +76,7 @@ class SimpleRNNRLAgent(Agent):
         # sensor_inputs, (prev_)states and actions are all dict
         max_steps = self.env._max_episode_steps
         obs = self.env.reset()
-        episode_end = 0
+        alive = 1
         r = 0
         log_entry = GameLogEntry(self.id, 'RL')
         state = self.init_states['RL']["state"]
@@ -87,7 +87,7 @@ class SimpleRNNRLAgent(Agent):
                 inputs=dict(sensor=np.array([obs]).astype("float32")),
                 states=dict(state=state))
             a = actions["action"][0][0]
-            next_obs, r, next_episode_end, _ = self.env.step(a)
+            next_obs, r, next_game_over, _ = self.env.step(a)
             r /= 100.0
 
             log_entry.num_steps += 1
@@ -98,12 +98,16 @@ class SimpleRNNRLAgent(Agent):
                 state=state,
                 action=[a],
                 reward=[r],
-                episode_end=[episode_end])
+                alive=[alive])
             obs = next_obs
-            episode_end = int(next_episode_end)
+            alive = 1 - int(next_game_over)
             state = next_states["state"]
-            if episode_end:
+            if not alive:
                 break
+
+        if alive:
+            alive = -1
+
         # we call `predict` one more time to get actions. Needed in case of
         # non-episode-end ending.
         actions, next_states = self.predict(
@@ -116,6 +120,6 @@ class SimpleRNNRLAgent(Agent):
             state=state,
             action=actions["action"][0],
             reward=[0],
-            episode_end=[episode_end])
+            alive=[alive])
         self.log_q.put(log_entry)
         return log_entry.total_reward

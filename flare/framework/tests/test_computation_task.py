@@ -208,7 +208,7 @@ class TestComputationTask(unittest.TestCase):
                 cost = ct.learn(
                     inputs=dict(sensor=sensor),
                     next_inputs=dict(sensor=next_sensor),
-                    next_episode_end=dict(episode_end=np.ones(
+                    next_alive=dict(alive=np.zeros(
                         (batch_size, 1)).astype("float32")),
                     actions=dict(action=actions),
                     rewards=dict(reward=rewards))

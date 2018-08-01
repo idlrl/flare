@@ -154,7 +154,7 @@ class Algorithm(object):
             # else for continuous actions, each action is already a vector
         return actions, states
 
-    def learn(self, inputs, next_inputs, states, next_states, next_episode_end,
+    def learn(self, inputs, next_inputs, states, next_states, next_alive,
               actions, next_actions, rewards):
         """
         This function computes a learning cost to be optimized.

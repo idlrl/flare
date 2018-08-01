@@ -24,7 +24,7 @@ class SimpleAC(Algorithm):
         self.discount_factor = discount_factor
         self.value_cost_weight = value_cost_weight
 
-    def learn(self, inputs, next_inputs, states, next_states, next_episode_end,
+    def learn(self, inputs, next_inputs, states, next_states, next_alive,
               actions, next_actions, rewards):
 
         action = actions["action"]
@@ -36,8 +36,8 @@ class SimpleAC(Algorithm):
         with torch.no_grad():
             next_values, next_states_update = self.model.value(next_inputs,
                                                                next_states)
-            next_value = next_values["v_value"] * (
-                1 - next_episode_end["episode_end"])
+            next_value = next_values["v_value"] * torch.abs(next_alive[
+                "alive"])
 
         assert value.size() == next_value.size()
 
@@ -119,7 +119,7 @@ class SimpleQ(Algorithm):
 
         return actions, states
 
-    def learn(self, inputs, next_inputs, states, next_states, next_episode_end,
+    def learn(self, inputs, next_inputs, states, next_states, next_alive,
               actions, next_actions, rewards):
 
         if self.update_ref_interval and self.total_batches % self.update_ref_interval == 0:
@@ -136,8 +136,8 @@ class SimpleQ(Algorithm):
         with torch.no_grad():
             next_values, next_states_update = self.ref_model.value(next_inputs,
                                                                    next_states)
-            next_q_value = next_values["q_value"] * (
-                1 - next_episode_end["episode_end"])
+            next_q_value = next_values["q_value"] * torch.abs(next_alive[
+                "alive"])
             next_value, _ = next_q_value.max(-1)
             next_value = next_value.unsqueeze(-1)
 
@@ -161,7 +161,7 @@ class SimpleSARSA(SimpleQ):
             exploration_end_rate=epsilon,
             update_ref_interval=0)
 
-    def learn(self, inputs, next_inputs, states, next_states, next_episode_end,
+    def learn(self, inputs, next_inputs, states, next_states, next_alive,
               actions, next_actions, rewards):
 
         action = actions["action"]
@@ -175,9 +175,84 @@ class SimpleSARSA(SimpleQ):
             next_values, next_states_update = self.model.value(next_inputs,
                                                                next_states)
             next_value = comf.idx_select(next_values["q_value"], next_action)
-            next_value = next_value * (1 - next_episode_end["episode_end"])
+            next_value = next_value * torch.abs(next_alive["alive"])
 
         critic_value = reward + self.discount_factor * next_value
         cost = (critic_value - comf.idx_select(q_value, action))**2
 
         return dict(cost=cost), states_update, next_states_update
+
+
+class OffPolicyAC(Algorithm):
+    """
+    Off-policy AC with clipped importance ratio.
+    Refer to PPO2 objective for details.
+
+    learn() requires keywords: "action", "reward", "v_value", "action_log_prob"
+    """
+
+    def __init__(self,
+                 model,
+                 epsilon=0.1,
+                 gpu_id=-1,
+                 discount_factor=0.99,
+                 value_cost_weight=1.0):
+
+        super(OffPolicyAC, self).__init__(model, gpu_id)
+        self.epsilon = epsilon
+        self.discount_factor = discount_factor
+        self.value_cost_weight = value_cost_weight
+
+    def get_action_specs(self):
+        ### "action_log_prob" is required by the algorithm but not by the model
+        return self.model.get_action_specs() + [
+            ("action_log_prob", dict(shape=[1]))
+        ]
+
+    def learn(self, inputs, next_inputs, states, next_states, next_alive,
+              actions, next_actions, rewards):
+        """
+        This learn() is expected to be called multiple times on each minibatch
+        """
+
+        action = actions["action"]
+        log_prob = actions["action_log_prob"]
+        reward = rewards["reward"]
+
+        values, states_update = self.model.value(inputs, states)
+        value = values["v_value"]
+
+        with torch.no_grad():
+            next_values, next_states_update = self.model.value(next_inputs,
+                                                               next_states)
+            next_value = next_values["v_value"] * torch.abs(next_alive[
+                "alive"])
+
+        assert value.size() == next_value.size()
+
+        critic_value = reward + self.discount_factor * next_value
+        td_error = (critic_value - value).squeeze(-1)
+        value_cost = td_error**2
+
+        dist, _ = self.model.policy(inputs, states)
+        dist = dist["action"]
+
+        if action.dtype == torch.int64 or action.dtype == torch.int32:
+            ## for discrete actions, we need to provide scalars to log_prob()
+            new_log_prob = dist.log_prob(action.squeeze(-1))
+        else:
+            new_log_prob = dist.log_prob(action)
+
+        ratio = torch.exp(new_log_prob - log_prob.squeeze(-1))
+        ### clip pg_cost according to the ratio
+        clipped_ratio = torch.clamp(
+            ratio, min=1 - self.epsilon, max=1 + self.epsilon)
+
+        pg_obj = torch.min(input=ratio * td_error.detach(),
+                           other=clipped_ratio * td_error.detach())
+        cost = self.value_cost_weight * value_cost - pg_obj
+
+        return dict(cost=cost.unsqueeze(-1)), states_update, next_states_update
+
+    def predict(self, inputs, states):
+        return self._rl_predict(self.model, inputs, states)

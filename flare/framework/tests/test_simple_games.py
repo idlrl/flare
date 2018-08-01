@@ -1,8 +1,7 @@
 from flare.framework.computation_task import ComputationTask
-from flare.algorithm_zoo.simple_algorithms import SimpleAC, SimpleQ, SimpleSARSA
+from flare.algorithm_zoo.simple_algorithms import SimpleAC, SimpleQ, SimpleSARSA, OffPolicyAC
 from flare.model_zoo.simple_models import SimpleModelAC, SimpleModelQ, GaussianPolicyModel
 from flare.algorithm_zoo.successor_representation import SuccessorRepresentationQ
-from flare.algorithm_zoo.ppo import PPO2
 from flare.model_zoo.successor_representation_models import SimpleSRModel
 import numpy as np
 import torch.nn as nn
@@ -23,13 +22,13 @@ def unpack_exps(exps):
 
 
 def sample(past_exps, n):
-    def is_game_over(episode_end):
-        return episode_end.values()[0][0][0]
+    def is_episode_end(alive):
+        return alive.values()[0][0][0] <= 0  # timeout or die
 
     sampled = []
     while len(sampled) < n:
         idx = np.random.randint(0, len(past_exps) - 1)
-        if is_game_over(past_exps[idx][3]):  ## episode end sampled
+        if is_episode_end(past_exps[idx][3]):  ## episode end sampled
             continue
         sampled.append((
             past_exps[idx][0],  ## inputs
@@ -53,7 +52,7 @@ class TestGymGame(unittest.TestCase):
             1.5,  ## hold the pole for at least 150 steps
             -3.0  ## can swing the stick to the top most of the times
         ]
-        on_policies = [False, True, True]
+        on_policies = [False, True, False]
         discrete_actions = [True, True, False]
 
         for game, threshold, on_policy, discrete_action in \
@@ -80,28 +79,28 @@ class TestGymGame(unittest.TestCase):
                 mlp=nn.Sequential(mlp, nn.Linear(hidden_size, num_actions)))
 
             if on_policy:
+                alg = SimpleSARSA(model=q_model, epsilon=0.1)
+                # alg = SuccessorRepresentationQ(
+                #     ## much slower than SARSA because of more things to learn
+                #     model=SimpleSRModel(
+                #         dims=state_shape,
+                #         hidden_size=hidden_size,
+                #         num_actions=num_actions, ),
+                #     exploration_end_steps=20000)
+            else:
                 if discrete_action:
-                    alg = SimpleSARSA(model=q_model, epsilon=0.1)
-                    # alg = SuccessorRepresentationQ(
-                    #     ## much slower than SARSA because of more things to learn
-                    #     model=SimpleSRModel(
-                    #         dims=state_shape,
-                    #         hidden_size=hidden_size,
-                    #         num_actions=num_actions, ),
-                    #     exploration_end_steps=20000)
+                    alg = SimpleQ(
+                        model=q_model,
+                        exploration_end_steps=200000,
+                        update_ref_interval=100)
                 else:
-                    alg = PPO2(
+                    alg = OffPolicyAC(
                         model=GaussianPolicyModel(
                             dims=state_shape,
                             action_dims=num_actions,
                             mlp=mlp,
                             std=1.0),
-                        iterations_per_batch=5)
-            else:
-                alg = SimpleQ(
-                    model=q_model,
-                    exploration_end_steps=500000,
-                    update_ref_interval=100)
+                        epsilon=0.2)
 
             glog.info("algorithm: " + alg.__class__.__name__)
 
@@ -119,7 +118,7 @@ class TestGymGame(unittest.TestCase):
             for n in range(max_episode):
                 ob = env.reset()
                 episode_reward = 0
-                game_over = 0
+                alive = 1
                 for t in range(max_steps):
                     inputs = dict(sensor=np.array([ob]).astype("float32"))
                     res, _ = ct.predict(inputs=inputs)
@@ -129,9 +128,14 @@ class TestGymGame(unittest.TestCase):
                     pred_action = res["action"][0]
 
                     ## end before the env wrongly gives game_over=True for a timeout case
-                    if t == max_steps - 1 or game_over:
+                    if t == max_steps - 1:
+                        past_exps.append(
+                            (inputs, res, dict(reward=[[0]]),
+                             dict(alive=[[-1]])))  ## -1 denotes timeout
+                        break
+                    elif (not alive):
                         past_exps.append((inputs, res, dict(reward=[[0]]),
-                                          dict(episode_end=[[game_over]])))
+                                          dict(alive=[[alive]])))
                         break
                     else:
                         next_ob, reward, next_is_over, _ = env.step(
@@ -139,7 +143,7 @@ class TestGymGame(unittest.TestCase):
                         reward /= 100
                         episode_reward += reward
                         past_exps.append((inputs, res, dict(reward=[[reward]]),
-                                          dict(episode_end=[[game_over]])))
+                                          dict(alive=[[alive]])))
 
                     ## only for off-policy training we use a circular buffer
                     if (not on_policy) and len(past_exps) > buffer_size_limit:
@@ -156,11 +160,11 @@ class TestGymGame(unittest.TestCase):
                     if learn_cond:
                         exps = sample(past_exps, batch_size)
                         sampled_inputs, next_sampled_inputs, sampled_actions, \
-                            next_sampled_actions, reward, next_episode_end = unpack_exps(exps)
+                            next_sampled_actions, reward, next_alive = unpack_exps(exps)
                         cost = ct.learn(
                             inputs=sampled_inputs,
                             next_inputs=next_sampled_inputs,
-                            next_episode_end=next_episode_end,
+                            next_alive=next_alive,
                             actions=sampled_actions,
                             next_actions=next_sampled_actions,
                             rewards=reward)
@@ -170,7 +174,7 @@ class TestGymGame(unittest.TestCase):
 
                     ob = next_ob
                     ### bool must be converted to int for correct computation
-                    game_over = int(next_is_over)
+                    alive = 1 - int(next_is_over)
 
                 if n % 50 == 0:
                     glog.info("episode reward: %f" % episode_reward)
