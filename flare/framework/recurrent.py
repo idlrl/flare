@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from flare.common.utils import split_list
 
 
 def make_hierarchy_of_tensors(data, dtype, device, shape):
@@ -62,9 +63,15 @@ def transpose(hier_tensors):
     return transposed
 
 
-def recurrent_group(seq_inputs,
+def recurrent_group(inputs,
+                    next_inputs,
+                    next_alive,
+                    actions,
+                    next_actions,
+                    rewards,
                     insts,
-                    init_states,
+                    states,
+                    next_states,
                     step_func,
                     out_states=False):
     """
@@ -77,6 +84,27 @@ def recurrent_group(seq_inputs,
     step_func: the function applied to the stripped inputs
     out_states: if True, also output the hidden states produced in the process
     """
+    seq_inputs = inputs.values() + \
+                 next_inputs.values() + \
+                 next_alive.values() + \
+                 actions.values() + \
+                 next_actions.values() + \
+                 rewards.values()
+    init_states = states.values() + next_states.values()
+    # `lens` and `keys` are required by the step function
+    lens = [len(inputs), len(next_inputs), len(next_alive),
+            len(actions), len(next_actions), len(rewards),
+            len(states), len(next_states)]
+    keys = dict(
+            inputs=inputs.keys(),
+            next_inputs=next_inputs.keys(),
+            states=states.keys(),
+            next_states=next_states.keys(),
+            next_alive=next_alive.keys(),
+            actions=actions.keys(),
+            next_actions=next_actions.keys(),
+            rewards=rewards.keys())
+
     assert isinstance(seq_inputs, list)
     assert isinstance(insts, list)
     assert isinstance(init_states, list)
@@ -147,7 +175,7 @@ def recurrent_group(seq_inputs,
         ## we should cut the insts and states by the frame_size
         states = [s[:frame_size] for s in states]
         insts = [i[:frame_size] for i in insts]
-        out_frames, states = step_func(*(in_frames + insts + states))
+        out_frames, states = step_func(lens, keys, *(in_frames + insts + states))
         if out_states:
             out_frames += states
         transposed_out_frames.append(out_frames)
@@ -162,3 +190,21 @@ def recurrent_group(seq_inputs,
     seq_outs = [[out[i] for i in reverse_idx] for out in seq_outs]
 
     return seq_outs
+
+def step_func(learn_func, lens, keys, *args):
+    ipts, nipts, nee, act, nact, rs, sts, nsts = split_list(list(args), lens)
+    ## We wrap each input into a dictionary because learn_func
+    ## is expected to receive dicts and output dicts
+    costs, sts_update, nsts_update = learn_func(
+        dict(zip(keys["inputs"], ipts)),
+        dict(zip(keys["next_inputs"], nipts)),
+        dict(zip(keys["states"], sts)),
+        dict(zip(keys["next_states"], nsts)),
+        dict(zip(keys["next_alive"], nee)),
+        dict(zip(keys["actions"], act)),
+        dict(zip(keys["next_actions"], nact)),
+        dict(zip(keys["rewards"], rs)))
+    return costs.values(), \
+        [sts_update[k] for k in keys["states"]] + \
+        [nsts_update[k] for k in keys["states"]]
+

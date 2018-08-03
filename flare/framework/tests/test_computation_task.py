@@ -63,7 +63,7 @@ class TestComputationTask(unittest.TestCase):
 
         def test(input, ct, max):
             action_counter = [0] * num_actions
-            total = 2000
+            total = 3000
             for i in range(total):
                 actions, states = ct.predict(inputs=input)
                 assert not states, "states should be empty"
@@ -89,17 +89,15 @@ class TestComputationTask(unittest.TestCase):
             width=84, height=84, num_actions=num_actions))
 
         q = SimpleQ(model=SimpleModelQ(
-            dims=dims,
+            dims=[dims],
             num_actions=num_actions,
-            mlp=nn.Sequential(
+            perception_net=nn.Sequential(
                 nn.Linear(
                     dims, 32, bias=False),
                 nn.ReLU(),
                 nn.Linear(
                     32, 16, bias=False),
-                nn.ReLU(),
-                nn.Linear(
-                    16, num_actions, bias=False))))
+                nn.ReLU())))
 
         batch_size = 10
         height, width = 84, 84
@@ -117,13 +115,13 @@ class TestComputationTask(unittest.TestCase):
         Test case for two CTs sharing parameters
         """
         alg = TestAlgorithm(model=SimpleModelDeterministic(
-            dims=10, mlp=nn.Linear(10, 10)))
+            dims=[10], perception_net=nn.Linear(10, 10)))
         ct0 = ComputationTask("test", algorithm=alg)
         ct1 = ComputationTask("test", algorithm=alg)
 
         batch_size = 10
         sensor = np.random.uniform(
-            0, 1, [batch_size, alg.model.dims]).astype("float32")
+            0, 1, [batch_size] + alg.model.dims).astype("float32")
 
         outputs0, _ = ct0.predict(inputs=dict(sensor=sensor))
         outputs1, _ = ct1.predict(inputs=dict(sensor=sensor))
@@ -137,14 +135,14 @@ class TestComputationTask(unittest.TestCase):
         """
 
         alg = TestAlgorithm(model=SimpleModelDeterministic(
-            dims=10, mlp=nn.Linear(10, 10)))
+            dims=[10], perception_net=nn.Linear(10, 10)))
 
         ct0 = ComputationTask("test", algorithm=alg)
         ct1 = ComputationTask("test", algorithm=deepcopy(alg))
 
         batch_size = 10
         sensor = np.random.uniform(
-            0, 1, [batch_size, ct0.alg.model.dims]).astype("float32")
+            0, 1, [batch_size] + ct0.alg.model.dims).astype("float32")
 
         outputs0, _ = ct0.predict(inputs=dict(sensor=sensor))
         outputs1, _ = ct1.predict(inputs=dict(sensor=sensor))
@@ -165,35 +163,37 @@ class TestComputationTask(unittest.TestCase):
 
         for on_policy in [True, False]:
             if on_policy:
-                alg = SimpleAC(model=SimpleModelAC(
-                    dims=dims,
-                    num_actions=num_actions,
-                    mlp=nn.Sequential(
-                        nn.Linear(
-                            dims, 64, bias=False),
-                        nn.ReLU(),
-                        nn.Linear(
-                            64, 32, bias=False),
-                        nn.ReLU())))
-                ct = ComputationTask(
-                    "test", algorithm=alg, hyperparas=dict(lr=1e-1))
+                perception_net = nn.Sequential(
+                    nn.Linear(
+                        dims, 64, bias=False),
+                    nn.ReLU(),
+                    nn.Linear(
+                        64, 32, bias=False),
+                    nn.ReLU())
+                alg = SimpleAC(
+                    model=SimpleModelAC(
+                        dims=[dims],
+                        num_actions=num_actions,
+                        perception_net=perception_net),
+                    optim=(torch.optim.RMSprop, dict(lr=1e-1)))
+                ct = ComputationTask("test", algorithm=alg)
             else:
+                perception_net = nn.Sequential(
+                    nn.Linear(
+                        dims, 64, bias=False),
+                    nn.ReLU(),
+                    nn.Linear(
+                        64, 32, bias=False),
+                    nn.ReLU())
                 alg = SimpleQ(
                     model=SimpleModelQ(
-                        dims=dims,
+                        dims=[dims],
                         num_actions=num_actions,
-                        mlp=nn.Sequential(
-                            nn.Linear(
-                                dims, 64, bias=False),
-                            nn.ReLU(),
-                            nn.Linear(
-                                64, 32, bias=False),
-                            nn.ReLU(),
-                            nn.Linear(
-                                32, num_actions, bias=False))),
-                    update_ref_interval=100)
-                ct = ComputationTask(
-                    "test", algorithm=alg, hyperparas=dict(lr=1e-1))
+                        perception_net=perception_net),
+                    update_ref_interval=100,
+                    optim=(torch.optim.RMSprop, dict(lr=1e-1)))
+
+                ct = ComputationTask("test", algorithm=alg)
 
             for i in range(1000):
                 if on_policy:

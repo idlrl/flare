@@ -1,6 +1,7 @@
 from random import randint
 import torch.nn as nn
-from flare.algorithm_zoo.simple_algorithms import SimpleAC
+import torch.optim as optim
+from flare.algorithm_zoo.simple_rnn_algorithms import SimpleRNNAC
 from flare.framework.manager import Manager
 from flare.model_zoo.simple_models import SimpleRNNModelAC
 from flare.agent_zoo.simple_rl_agents import SimpleRNNRLAgent
@@ -29,8 +30,10 @@ if __name__ == '__main__':
         nn.Linear(state_shape[0], hidden_size),
         nn.ReLU(), nn.Linear(hidden_size, hidden_size), nn.ReLU())
 
-    alg = SimpleAC(model=SimpleRNNModelAC(
-        dims=state_shape, num_actions=num_actions, perception_net=mlp))
+    alg = SimpleRNNAC(model=SimpleRNNModelAC(dims=state_shape,
+                                             num_actions=num_actions,
+                                             perception_net=mlp),
+                      optim=(optim.RMSprop, dict(lr=1e-4)))
 
     # 3. Specify the settings for learning: the algorithm to use (SimpleAC
     # in this case), data sampling strategy (OnlineHelper here) and other
@@ -38,7 +41,6 @@ if __name__ == '__main__':
     ct_settings = {
         "RL": dict(
             algorithm=alg,
-            hyperparas=dict(lr=1e-4),
             # sampling
             agent_helper=OnlineHelper,
             sample_interval=8,

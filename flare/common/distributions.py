@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torch.distributions.distribution import Distribution
 

@@ -1,5 +1,6 @@
 from random import randint
 import torch.nn as nn
+import torch.optim as optim
 from flare.algorithm_zoo.simple_algorithms import SimpleQ
 from flare.framework.manager import Manager
 from flare.model_zoo.simple_models import SimpleModelQ
@@ -44,7 +45,6 @@ if __name__ == '__main__':
         "RL": dict(
             num_agents=num_agents,
             algorithm=alg,
-            hyperparas=dict(lr=1e-4),
             # sampling
             agent_helper=ExpReplayHelper,
             buffer_capacity=200000 / num_agents,
