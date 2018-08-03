@@ -1,4 +1,3 @@
-import gym
 from random import randint
 import torch.nn as nn
 from flare.algorithm_zoo.simple_algorithms import SimpleAC
@@ -6,6 +5,7 @@ from flare.framework.manager import Manager
 from flare.model_zoo.simple_models import SimpleModelAC
 from parl.agent_zoo.simple_rl_agents import SimpleRLAgent
 from parl.framework.agent import OnPolicyHelper
+from parl.framework.env import GymEnv
 
 if __name__ == '__main__':
     """
@@ -13,12 +13,12 @@ if __name__ == '__main__':
     """
     game = "CartPole-v0"
 
-    num_agents = 8
+    num_agents = 16
     num_games = 8000
     # 1. Create environments
     envs = []
     for _ in range(num_agents):
-        envs.append(gym.make(game))
+        envs.append(GymEnv(game))
     state_shape = envs[-1].observation_space.shape[0]
     num_actions = envs[-1].action_space.n
 
@@ -38,11 +38,11 @@ if __name__ == '__main__':
     ct_settings = {
         "RL": dict(
             algorithm=alg,
-            hyperparas=dict(lr=1e-4),
+            hyperparas=dict(lr=5e-5),
             # sampling
             agent_helper=OnPolicyHelper,
             # each agent will call `learn()` every `sample_interval` steps
-            sample_interval=8,
+            sample_interval=2,
             num_agents=num_agents)
     }
 

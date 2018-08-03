@@ -1,18 +1,9 @@
 from abc import ABCMeta, abstractmethod
 from multiprocessing import Process, Value
 import numpy as np
+from parl.common.logging import GameLogEntry
 from parl.common.communicator import AgentCommunicator
 from parl.common.replay_buffer import NoReplacementQueue, ReplayBuffer, Experience
-
-
-class abstractstatic(staticmethod):
-    __slots__ = ()
-
-    def __init__(self, function):
-        super(abstractstatic, self).__init__(function)
-        function.__isabstractmethod__ = True
-
-    __isabstractmethod__ = True
 
 
 class AgentHelper(object):
@@ -68,6 +59,10 @@ class AgentHelper(object):
             ret["rewards"][
                 k] = [extract_key(exp_seq[:-1], k) for exp_seq in exp_seqs]
 
+        if self.state_keys:
+            ret["states"] = dict()
+            ret["next_states"] = dict()
+
         for k in self.state_keys:
             ## we only take the first/second element of a seq
             ret["states"][
@@ -86,14 +81,6 @@ class AgentHelper(object):
                         ret[k][kk] = concat_lists(ret[k][kk])
 
         return ret, size
-
-    @abstractstatic
-    def exp_replay():
-        """
-        Return a bool value indicating whether the helper requires experience
-        replay or not.
-        """
-        pass
 
     def predict(self, inputs, states=dict()):
         """
@@ -118,14 +105,16 @@ class AgentHelper(object):
         """
         pass
 
-    def store_data(self, **kwargs):
+    def _store_data(self, alive, data):
         """
         Store the past experience for later use, e.g., experience replay.
 
         Args:
             data(dict): data to store.
         """
-        t = Experience(kwargs)
+        assert isinstance(data, dict)
+        data["alive"] = [alive]
+        t = Experience(data)
         self.add_experience(t)
         self.counter += 1
         if self.counter % self.sample_interval == 0:
@@ -237,9 +226,10 @@ class Agent(Process):
         self.num_games = num_games
         self.state_specs = None
         self.helpers = {}
-        self.log_q = []
+        self.log_q = None
         self.running = Value('i', 0)
         self.daemon = True
+        self.alive = 1
 
     def add_agent_helper(self, helper, input_keys, action_keys, state_keys,
                          reward_keys):
@@ -260,27 +250,13 @@ class Agent(Process):
             states = {}
             for specs in specs_list:
                 dtype = specs[1]["dtype"] if "dtype" in specs[1] else "float32"
-                states[specs[0]] = np.zeros([1] + specs[1]["shape"]).astype(
-                    dtype)
+                states[specs[0]] = np.zeros(specs[1]["shape"]).astype(dtype)
             self.init_states[alg_name] = states
-
-    @abstractmethod
-    def _run_one_episode(self):
-        """
-        This function implements the control flow of running one episode, which
-        includes:
-        1. The interaction with the environment
-        2. Calls AgentHelper's interfaces to process the data
-        """
-        pass
 
     ## The following three functions hide the `AgentHelper` from the users of
     ## `Agent`.
     def predict(self, alg_name, inputs, states=dict()):
         return self.helpers[alg_name].predict(inputs, states)
-
-    def store_data(self, alg_name, **kwargs):
-        self.helpers[alg_name].store_data(**kwargs)
 
     def learn(self, alg_name):
         self.helpers[alg_name].learn()
@@ -295,3 +271,85 @@ class Agent(Process):
             if not self.running.value:
                 return
         self.running.value = 0
+
+    def _store_data(self, alg_name, data):
+        self.helpers[alg_name]._store_data(self.alive, data)
+
+    def _run_one_episode(self):
+        observations = self._reset_env()
+        states = self._get_init_states()  ##
+
+        while self.alive and (not self._game_timeout()):
+            actions, next_states = self._cts_predict(observations, states)  ##
+            assert isinstance(actions, list)
+            assert isinstance(next_states, list)
+            next_observations, rewards, next_game_over = self._step_env(
+                actions)
+            self._cts_store_data(observations, actions, states, rewards)  ##
+            observations = next_observations
+            states = next_states
+            self.alive = 1 - int(next_game_over)
+
+        actions, _ = self._cts_predict(observations, states)
+        if self._game_timeout():
+            self.alive = -1
+        self._cts_store_data(observations, actions, states, [0] * len(rewards))
+
+        return self._total_reward()
+
+    def _reset_env(self):
+        self.alive = 1
+        self.steps = 0
+        ## currently we only support a single logger for all CTs
+        self.log_entry = GameLogEntry(self.id, 'All')
+        obs = self.env.reset()
+        assert isinstance(obs, list)
+        self.max_steps = self.env.get_max_steps()
+        return obs
+
+    def _game_timeout(self):
+        ## For OpenAI gym, end one step earlier to avoid
+        ## getting the game_over signal
+
+        return self.steps >= self.max_steps - 1
+
+    def _step_env(self, actions):
+        self.steps += 1
+        next_observations, rewards, next_game_over = self.env.step(actions)
+        assert isinstance(next_observations, list)
+        assert isinstance(rewards, list)
+        self.log_entry.num_steps += 1
+        self.log_entry.total_reward += sum(rewards)
+        return next_observations, rewards, next_game_over
+
+    def _total_reward(self):
+        self.log_q.put(self.log_entry)
+        return self.log_entry.total_reward
+
+    def _get_init_states(self):
+        """
+        By default, there is no state. The user needs to override this function
+        to return a list of init states if necessary.
+        """
+        return []
+
+    @abstractmethod
+    def _cts_predict(self, observations, states):
+        """
+        The user needs to override this function to specify how different CTs
+        make predictions given observations and states.
+
+        Output: actions:           a list of actions, each action being a vector
+                                   If the action is discrete, then it is a length-one
+                                   list of an integer.
+                states (optional): a list of states, each state being a floating vector
+        """
+        pass
+
+    @abstractmethod
+    def _cts_store_data(self, observations, actions, states, rewards):
+        """
+        The user needs to override this function to specify how different CTs
+        store their corresponding experiences, by calling self._store_data().
+        """
+        pass
