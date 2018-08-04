@@ -277,15 +277,17 @@ class Agent(Process):
 
     def _run_one_episode(self):
         observations = self._reset_env()
-        states = self._get_init_states()  ##
+        states = self._get_init_states()  ## written by user
 
         while self.alive and (not self._game_timeout()):
-            actions, next_states = self._cts_predict(observations, states)  ##
+            actions, next_states = self._cts_predict(
+                observations, states)  ## written by user
             assert isinstance(actions, list)
             assert isinstance(next_states, list)
             next_observations, rewards, next_game_over = self._step_env(
                 actions)
-            self._cts_store_data(observations, actions, states, rewards)  ##
+            self._cts_store_data(observations, actions, states,
+                                 rewards)  ## written by user
             observations = next_observations
             states = next_states
             self.alive = 1 - int(next_game_over)

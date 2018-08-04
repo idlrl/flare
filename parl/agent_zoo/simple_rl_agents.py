@@ -32,7 +32,7 @@ class SimpleRLAgent(Agent):
 
 class SimpleRNNRLAgent(Agent):
     """
-    This class serves as a example of simple RL algorithms with a single RNN state,
+    This class serves as an example of simple RL algorithms with a single RNN state,
     which has only one ComputationTask, "RL", i.e., using and learning an RL policy.
 
     By using different AgentHelpers, this Agent can be applied to either on-
