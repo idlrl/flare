@@ -1,8 +1,8 @@
 from multiprocessing import Queue
 from Queue import Empty, Full
 from threading import Thread, Lock
-from parl.common.communicator import CTCommunicator, AgentCommunicator
-from parl.common.utils import concat_dicts, split_dict
+from flare.common.communicator import CTCommunicator, AgentCommunicator
+from flare.common.utils import concat_dicts, split_dict
 
 
 class ComputationDataProcessor(object):

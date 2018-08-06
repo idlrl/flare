@@ -1,11 +1,10 @@
-from random import randint
 import torch.nn as nn
 from flare.algorithm_zoo.simple_algorithms import SimpleAC
 from flare.framework.manager import Manager
 from flare.model_zoo.simple_models import SimpleModelAC
-from parl.agent_zoo.simple_rl_agents import SimpleRLAgent
-from parl.framework.agent import OnPolicyHelper
-from parl.framework.env import GymEnv
+from flare.agent_zoo.simple_rl_agents import SimpleRLAgent
+from flare.framework.agent import OnPolicyHelper
+from flare.framework.env import GymEnv
 
 if __name__ == '__main__':
     """
@@ -32,9 +31,9 @@ if __name__ == '__main__':
     alg = SimpleAC(model=SimpleModelAC(
         dims=state_shape, num_actions=num_actions, mlp=mlp))
 
-    # 3. Specify the settings for learning: the algorithm to use (SimpleAC
-    # in this case), data sampling strategy (OnPolicyHelper here) and other
-    # settings used by ComputationTask.
+    # 3. Specify the settings for learning: data sampling strategy
+    # (OnPolicyHelper here) and other settings used by
+    # ComputationTask.
     ct_settings = {
         "RL": dict(
             algorithm=alg,
@@ -42,11 +41,11 @@ if __name__ == '__main__':
             # sampling
             agent_helper=OnPolicyHelper,
             # each agent will call `learn()` every `sample_interval` steps
-            sample_interval=2,
+            sample_interval=4,
             num_agents=num_agents)
     }
 
-    # 4. Create Manager that handles the running of the whole framework
+    # 4. Create Manager that handles the running of the whole pipeline
     manager = Manager(ct_settings)
 
     # 5. Spawn one agent for each instance of environment.

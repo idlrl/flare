@@ -1,8 +1,8 @@
 import numpy as np
 import unittest
-from parl.common.error_handling import LastExpError
-from parl.common.replay_buffer import Experience
-from parl.common.replay_buffer import ReplayBuffer, NoReplacementQueue, Sample
+from flare.common.error_handling import LastExpError
+from flare.common.replay_buffer import Experience
+from flare.common.replay_buffer import ReplayBuffer, NoReplacementQueue, Sample
 
 
 class TestNoReplacementQueue(unittest.TestCase):

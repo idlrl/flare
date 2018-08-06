@@ -4,7 +4,7 @@ from algorithm import Model, Algorithm
 import recurrent as rc
 import numpy as np
 import operator
-from parl.framework.computation_data_processor import ComputationDataProcessor
+from flare.framework.computation_data_processor import ComputationDataProcessor
 
 
 def split_list(l, sizes):
