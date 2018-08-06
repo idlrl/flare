@@ -16,8 +16,8 @@ def split_list(l, sizes):
 
 def concat_dicts(dict_list):
     """
-    Concatenate values of each key from a list of dictionary. 
-    
+    Concatenate values of each key from a list of dictionary.
+
     The type of values should be `numpy.ndarray`, and the result is
     the concatenation of these values at axis=0.
     """

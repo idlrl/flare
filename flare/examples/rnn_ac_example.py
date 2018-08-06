@@ -11,7 +11,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import gym
 from random import randint
 import torch.nn as nn
 from flare.algorithm_zoo.simple_algorithms import SimpleAC
@@ -19,6 +18,7 @@ from flare.framework.manager import Manager
 from flare.model_zoo.simple_models import SimpleRNNModelAC
 from parl.agent_zoo.simple_rl_agents import SimpleRNNRLAgent
 from parl.framework.agent import OnPolicyHelper
+from parl.framework.env import GymEnv
 
 if __name__ == '__main__':
     """
@@ -26,12 +26,12 @@ if __name__ == '__main__':
     """
     game = "CartPole-v0"
 
-    num_agents = 4
+    num_agents = 2
     num_games = 8000
     # 1. Create environments
     envs = []
     for _ in range(num_agents):
-        envs.append(gym.make(game))
+        envs.append(GymEnv(game))
     state_shape = envs[-1].observation_space.shape[0]
     num_actions = envs[-1].action_space.n
 

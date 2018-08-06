@@ -6,20 +6,21 @@ import random
 
 
 class Experience(object):
-    def __init__(self, quantities):
-        assert isinstance(quantities, dict)
-        assert "alive" in quantities
-        self.alive = quantities["alive"][0]
-        self.quantities = quantities
+    def __init__(self, data):
+        assert isinstance(data, dict)
+        assert "alive" in data
+        self.alive = data["alive"][0]
+        self.data = data
 
     def is_episode_end(self):
         return self.alive <= 0
 
     def val(self, key):
-        return self.quantities[key]
+        assert key in self.data, "%s is missing!" % key
+        return self.data[key]
 
     def keys(self):
-        return sorted(self.quantities.keys())
+        return sorted(self.data.keys())
 
 
 class Sample(object):
