@@ -1,9 +1,9 @@
 from abc import ABCMeta, abstractmethod
 from multiprocessing import Process, Value
 import numpy as np
-from parl.common.logging import GameLogEntry
-from parl.common.communicator import AgentCommunicator
-from parl.common.replay_buffer import NoReplacementQueue, ReplayBuffer, Experience
+from flare.common.logging import GameLogEntry
+from flare.common.communicator import AgentCommunicator
+from flare.common.replay_buffer import NoReplacementQueue, ReplayBuffer, Experience
 
 
 class AgentHelper(object):

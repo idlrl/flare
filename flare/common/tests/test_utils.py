@@ -1,7 +1,7 @@
 import numpy as np
 import unittest
-from parl.common.error_handling import LastExpError
-from parl.common.utils import concat_dicts, split_dict
+from flare.common.error_handling import LastExpError
+from flare.common.utils import concat_dicts, split_dict
 
 
 class TestUtils(unittest.TestCase):

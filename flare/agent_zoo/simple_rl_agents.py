@@ -1,5 +1,5 @@
 import numpy as np
-from parl.framework.agent import Agent
+from flare.framework.agent import Agent
 
 
 class SimpleRLAgent(Agent):
