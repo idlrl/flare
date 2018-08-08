@@ -30,7 +30,7 @@ export PYTHONPATH=<flare_root>:$PYTHONPATH
 ## A quick tutorial in 5 minutes
 Some quick examples can be found in `flare/examples`. Below we show step-by-step code to train the "CartPole-v0" game from OpenAI Gym.
 
-1. First we import different Python modules which all together constitute the overall training pipeline. Some modules such as ```SimpleAC```, ```SimpleModelAC```, and ```SimpleRLAgent``` were already implemented by us as *examples* of Algorithm, Model, and Agent classes. The users are encouraged to modify or write their own for more complex problems. This advanced topic of user customizing modules is explained in details in [Customize Your Own Modules](#).
+1. First we import different Python modules which all together constitute the overall training pipeline. Some modules such as ```SimpleAC```, ```SimpleModelAC```, and ```SimpleRLAgent``` were already implemented by us as *examples* of Algorithm, Model, and Agent classes. The users are encouraged to modify or write their own for more complex problems. This advanced topic of user customizing modules is explained in details in [Customize Your Own Modules](tutorial/customize.md).
 
 ```python
 """
@@ -128,7 +128,7 @@ python flare/examples/ac_example.py
 The accumulated episodic reward is expected to reach and maintain the maximal value of 199.0 (i.e., the cart holds the pole until timeout) after about 4000 games trained on a machine with 16 CPUs.
 
 ## Advanced usage
-You might want to take a look at a more comprehensive [tutorial](#) of FLARE.
+You might want to take a look at a more comprehensive [tutorial](tutorial/index.md) of FLARE.
 
 ## License
 FLARE has the Apache 2.0 license.
