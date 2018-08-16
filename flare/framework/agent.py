@@ -9,7 +9,7 @@ from flare.common.replay_buffer import NoReplacementQueue, ReplayBuffer, Experie
 class AgentHelper(object):
     """
     AgentHelper abstracts some part of Agent's data processing and the I/O
-    communication between Agent and ComputationDataProcessor (CP). It receives a
+    communication between Agent and ComputationDataProcessor (CDP). It receives a
     Communicator from one CDP and uses it to send data to the CDP.
     """
     __metaclass__ = ABCMeta
@@ -215,7 +215,7 @@ class Agent(Process):
     helpers:    a dictionary of `AgentHelper`, each corresponds to one
                 `ComputationTask`
     log_q:      communication channel between `Agent` and the centralized logger
-    running:    the `Agetn` will keep running as long as `running` is True.
+    running:    the `Agent` will keep running as long as `running` is True.
     """
     __metaclass__ = ABCMeta
 
