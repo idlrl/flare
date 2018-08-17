@@ -188,10 +188,7 @@ class ComputationTask(object):
                                              next_states, next_alive, actions,
                                              next_actions, rewards)
 
-            ### backward and step
-            total_cost, total = sum_cost(costs["cost"])
-            avg_cost = total_cost / total
-            avg_cost.backward()
+            ### backward distributed in algorithm and step globally
             self.optim.step()
 
         return self._retrieve_np_arrays(costs)
