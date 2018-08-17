@@ -11,8 +11,9 @@ class SimpleRLAgent(Agent):
     policy or off-policy RL algorithms.
     """
 
-    def __init__(self, env, num_games):
+    def __init__(self, env, num_games, reward_shaping_f=lambda x: x):
         super(SimpleRLAgent, self).__init__(env, num_games)
+        self.reward_shaping_f = reward_shaping_f
 
     def _cts_store_data(self, observations, actions, states, rewards):
         assert len(observations) == 1 and len(actions) == 1
@@ -21,7 +22,7 @@ class SimpleRLAgent(Agent):
             dict(
                 sensor=observations[0],
                 action=actions[0],
-                reward=[r / 100.0 for r in rewards]))
+                reward=[self.reward_shaping_f(r) for r in rewards]))
 
     def _cts_predict(self, observations, states):
         ## each action is already 2D
@@ -39,8 +40,9 @@ class SimpleRNNRLAgent(Agent):
     policy or off-policy RL algorithms.
     """
 
-    def __init__(self, env, num_games):
+    def __init__(self, env, num_games, reward_shaping_f=lambda x: x):
         super(SimpleRNNRLAgent, self).__init__(env, num_games)
+        self.reward_shaping_f = reward_shaping_f
 
     def _get_init_states(self):
         return self.init_states['RL'].values()
@@ -54,7 +56,7 @@ class SimpleRNNRLAgent(Agent):
                 sensor=observations[0],
                 action=actions[0],
                 state=states[0],
-                reward=[r / 100.0 for r in rewards]))
+                reward=[self.reward_shaping_f(r) for r in rewards]))
 
     def _cts_predict(self, observations, states):
         ## each action is already 2D

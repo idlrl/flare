@@ -7,7 +7,11 @@ import sys
 
 
 class Manager(object):
-    def __init__(self, ct_settings):
+    def __init__(self,
+                 ct_settings,
+                 log_settings=dict(
+                     print_interval=100, model_dir="",
+                     model_save_interval=10)):
         """
             Initialize `Manager`. `ct_settings` is used to create
             `ComputationTask`; The parameters in `ct_settings` are for each
@@ -17,9 +21,14 @@ class Manager(object):
         self.cts = {}
         self.CDPs = {}
         for name, setting in ct_settings.iteritems():
+            setting["model_dir"] = log_settings["model_dir"]
             self.cts[name] = ComputationTask(name, **setting)
             self.CDPs[name] = self.cts[name].CDP
-        self.logger = GameLogger(1, 100)
+        self.logger = GameLogger(
+            timeout=1,
+            print_interval=log_settings["print_interval"],
+            model_save_interval=log_settings["model_save_interval"],
+            cts=self.cts)
 
     def __signal_handler(self, sig, frame):
         # this is still not good, as we don't get a chance to normally stop

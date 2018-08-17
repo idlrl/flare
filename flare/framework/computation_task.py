@@ -1,3 +1,6 @@
+import os
+import glog
+import glob
 import torch
 import torch.optim as optim
 from algorithm import Model, Algorithm
@@ -30,15 +33,41 @@ class ComputationTask(object):
     c. define a ComputationTask with the algorithm
     """
 
-    def __init__(self, name, algorithm, hyperparas=dict(lr=1e-4), **kwargs):
+    def __init__(self,
+                 name,
+                 algorithm,
+                 hyperparas=dict(
+                     lr=1e-4, grad_clip=0),
+                 model_dir="",
+                 **kwargs):
         assert isinstance(algorithm, Algorithm)
         self.name = name
         self.hp = hyperparas
+        if model_dir == "":
+            self.model_file = ""
+        else:
+            os.system("mkdir -p " + model_dir)
+            self.model_file = model_dir + "/" + name
         self.alg = algorithm
         self.optim = optim.RMSprop(
             self.alg.model.parameters(), lr=hyperparas["lr"])
         self._cdp_args = kwargs
         self._cdp = None
+        ## if model_file is not empty, then we load an init model
+        if self.model_file != "":
+            models = glob.glob(self.model_file)
+            if models:
+                ## for now, we take the most recent model
+                most_recent_model_file = sorted(models)[-1]
+                self.alg.model.load_state_dict(
+                    torch.load(most_recent_model_file))
+                glog.info("Loading the model " + most_recent_model_file)
+
+    def save_model(self, idx):
+        if self.model_file != "":
+            model_file = "%s%06d" % (self.model_file, idx)
+            ## TODO: CUDA error
+            torch.save(self.alg.model.state_dict(), model_file)
 
     def get_state_specs(self):
         return self.alg.get_state_specs()
@@ -147,6 +176,8 @@ class ComputationTask(object):
             return sum(costs), sum(ns)
 
         for i in range(self.alg.iterations_per_batch):
+            ## First we zero the gradients,
+            ## after which backward() should be called by the user in algorithms' learn()
             self.optim.zero_grad()
             if states:  ## if states is not empty, we apply a recurrent_group first
 
@@ -188,7 +219,10 @@ class ComputationTask(object):
                                              next_states, next_alive, actions,
                                              next_actions, rewards)
 
-            ### backward distributed in algorithm and step globally
+            ## If gradient clipping is enabled, we should do this before step() after backward()
+            if "grad_clip" in self.hp and self.hp["grad_clip"] > 0:
+                torch.nn.utils.clip_grad_norm_(self.alg.model.parameters(),
+                                               self.hp["grad_clip"])
             self.optim.step()
 
         return self._retrieve_np_arrays(costs)

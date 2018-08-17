@@ -62,3 +62,9 @@ def sum_cost(costs):
     assert isinstance(costs, list)
     costs, ns = zip(*map(sum_cost, costs))
     return sum(costs), sum(ns)
+
+
+class Flatten(nn.Module):
+    def forward(self, x):
+        x = x.view(x.size()[0], -1)
+        return x
