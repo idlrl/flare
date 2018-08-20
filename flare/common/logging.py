@@ -61,6 +61,7 @@ class GameLogger(Process):
         self.running = Value('i', 0)
         self.log_q = Queue()
         self.counter = 0
+        self.daemon = True
 
     def __flush_log(self):
         for alg_name, stats in self.stats.iteritems():

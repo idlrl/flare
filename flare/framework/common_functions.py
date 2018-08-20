@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.distributions import Categorical
+import operator
 
 
 def q_categorical(q_value):
@@ -47,3 +48,17 @@ def one_hot(idx, depth):
     if idx.is_cuda:
         ones = ones.to(idx.get_device())
     return ones.index_select(0, idx.long())
+
+
+def get_avg_cost(costs):
+    cost_total, weight_total = sum_cost(costs)
+    avg_cost = cost_total / weight_total
+    return avg_cost
+
+
+def sum_cost(costs):
+    if isinstance(costs, torch.Tensor):
+        return (costs.view(-1).sum(), reduce(operator.mul, costs.size()))
+    assert isinstance(costs, list)
+    costs, ns = zip(*map(sum_cost, costs))
+    return sum(costs), sum(ns)

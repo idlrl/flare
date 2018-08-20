@@ -90,5 +90,8 @@ class SuccessorRepresentationQ(SimpleQ):
         )**2
         sr_cost = sr_cost.mean(-1).unsqueeze(-1)
 
+        avg_cost = comf.get_avg_cost(reward_cost + sr_cost)
+        avg_cost.backward(retain_graph=True)
+
         return dict(
             cost=reward_cost + sr_cost), states_update, next_states_update

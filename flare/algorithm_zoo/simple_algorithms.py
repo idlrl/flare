@@ -57,7 +57,9 @@ class SimpleAC(Algorithm):
         cost = self.value_cost_weight * value_cost + pg_cost * td_error.detach(
         )
 
-        return dict(cost=cost.unsqueeze(-1)), states_update, next_states_update
+        avg_cost = comf.get_avg_cost(cost)
+        avg_cost.backward(retain_graph=True)
+        return dict(cost=cost), states_update, next_states_update
 
     def predict(self, inputs, states):
         return self._rl_predict(self.model, inputs, states)
@@ -147,6 +149,9 @@ class SimpleQ(Algorithm):
         critic_value = reward + self.discount_factor * next_value
         cost = (critic_value - value)**2
 
+        avg_cost = comf.get_avg_cost(cost)
+        avg_cost.backward(retain_graph=True)
+
         return dict(cost=cost), states_update, next_states_update
 
 
@@ -179,6 +184,9 @@ class SimpleSARSA(SimpleQ):
 
         critic_value = reward + self.discount_factor * next_value
         cost = (critic_value - comf.idx_select(q_value, action))**2
+
+        avg_cost = comf.get_avg_cost(cost)
+        avg_cost.backward(retain_graph=True)
 
         return dict(cost=cost), states_update, next_states_update
 
@@ -252,7 +260,10 @@ class OffPolicyAC(Algorithm):
                            other=clipped_ratio * td_error.detach())
         cost = self.value_cost_weight * value_cost - pg_obj
 
-        return dict(cost=cost.unsqueeze(-1)), states_update, next_states_update
+        avg_cost = comf.get_avg_cost(cost)
+        avg_cost.backward(retain_graph=True)
+
+        return dict(cost=cost), states_update, next_states_update
 
     def predict(self, inputs, states):
         return self._rl_predict(self.model, inputs, states)
