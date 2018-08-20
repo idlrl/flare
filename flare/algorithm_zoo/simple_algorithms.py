@@ -18,11 +18,13 @@ class SimpleAC(Algorithm):
                  model,
                  gpu_id=-1,
                  discount_factor=0.99,
-                 value_cost_weight=1.0):
+                 value_cost_weight=0.5,
+                 prob_entropy_weight=0.01):
 
         super(SimpleAC, self).__init__(model, gpu_id)
         self.discount_factor = discount_factor
         self.value_cost_weight = value_cost_weight
+        self.prob_entropy_weight = prob_entropy_weight
 
     def learn(self, inputs, next_inputs, states, next_states, next_alive,
               actions, next_actions, rewards):
@@ -54,8 +56,9 @@ class SimpleAC(Algorithm):
         else:
             pg_cost = -dist.log_prob(action)
 
-        cost = self.value_cost_weight * value_cost + pg_cost * td_error.detach(
-        )
+        cost = self.value_cost_weight * value_cost \
+               + pg_cost * td_error.detach() \
+               - self.prob_entropy_weight * dist.entropy()  ## increase entropy for exploration
 
         avg_cost = comf.get_avg_cost(cost)
         avg_cost.backward(retain_graph=True)

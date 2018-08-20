@@ -7,33 +7,38 @@ from torch.distributions import Categorical, MultivariateNormal
 
 
 class SimpleModelDeterministic(Model):
-    def __init__(self, dims, mlp):
+    def __init__(self, dims, perception_net):
         super(SimpleModelDeterministic, self).__init__()
+        assert isinstance(dims, list) or isinstance(dims, tuple)
         self.dims = dims
-        self.mlp = mlp
+        self.perception_net = perception_net
 
     def get_input_specs(self):
-        return [("sensor", dict(shape=[self.dims]))]
+        return [("sensor", dict(shape=self.dims))]
 
     def get_action_specs(self):
-        return [("continuous_action", dict(shape=[self.dims]))]
+        return [("continuous_action", dict(shape=self.dims))]
 
     def policy(self, inputs, states):
-        hidden = self.mlp(inputs.values()[0])
+        hidden = self.perception_net(inputs.values()[0])
         return dict(continuous_action=Deterministic(hidden)), states
 
 
 class SimpleModelAC(Model):
-    def __init__(self, dims, num_actions, mlp):
+    def __init__(self, dims, num_actions, perception_net):
         super(SimpleModelAC, self).__init__()
+        assert isinstance(dims, list) or isinstance(dims, tuple)
         self.dims = dims
-        hidden_size = list(mlp.modules())[-2].out_features
+        hidden_size = list(perception_net.modules())[-2].out_features
         self.policy_net = nn.Sequential(
-            mlp, nn.Linear(hidden_size, num_actions), nn.Softmax(dim=1))
-        self.value_net = nn.Sequential(mlp, nn.Linear(hidden_size, 1))
+            perception_net,
+            nn.Linear(hidden_size, num_actions),
+            nn.Softmax(dim=1))
+        self.value_net = nn.Sequential(perception_net,
+                                       nn.Linear(hidden_size, 1))
 
     def get_input_specs(self):
-        return [("sensor", dict(shape=[self.dims]))]
+        return [("sensor", dict(shape=self.dims))]
 
     def get_action_specs(self):
         return [("action", dict(shape=[1], dtype="int64"))]
@@ -47,14 +52,17 @@ class SimpleModelAC(Model):
 
 
 class SimpleModelQ(Model):
-    def __init__(self, dims, num_actions, mlp):
+    def __init__(self, dims, num_actions, perception_net):
         super(SimpleModelQ, self).__init__()
+        assert isinstance(dims, list) or isinstance(dims, tuple)
         self.dims = dims
         self.num_actions = num_actions
-        self.mlp = mlp
+        hidden_size = list(perception_net.modules())[-2].out_features
+        self.value_net = nn.Sequential(perception_net,
+                                       nn.Linear(hidden_size, num_actions))
 
     def get_input_specs(self):
-        return [("sensor", dict(shape=[self.dims]))]
+        return [("sensor", dict(shape=self.dims))]
 
     def get_action_specs(self):
         return [("action", dict(shape=[1], dtype="int64"))]
@@ -65,16 +73,17 @@ class SimpleModelQ(Model):
         return dict(action=comf.q_categorical(q_value)), states
 
     def value(self, inputs, states):
-        return dict(q_value=self.mlp(inputs.values()[0])), states
+        return dict(q_value=self.value_net(inputs.values()[0])), states
 
 
 class SimpleRNNModelAC(Model):
-    def __init__(self, dims, num_actions, mlp):
+    def __init__(self, dims, num_actions, perception_net):
         super(SimpleRNNModelAC, self).__init__()
+        assert isinstance(dims, list) or isinstance(dims, tuple)
         self.dims = dims
         self.num_actions = num_actions
-        self.hidden_size = list(mlp.children())[-2].out_features
-        self.hidden_layers = mlp
+        self.hidden_size = list(perception_net.children())[-2].out_features
+        self.hidden_layers = perception_net
         self.recurrent = nn.RNNCell(
             input_size=self.hidden_size,
             hidden_size=self.hidden_size,
@@ -84,7 +93,7 @@ class SimpleRNNModelAC(Model):
         self.value_layer = nn.Linear(self.hidden_size, 1)
 
     def get_input_specs(self):
-        return [("sensor", dict(shape=[self.dims]))]
+        return [("sensor", dict(shape=self.dims))]
 
     def get_action_specs(self):
         return [("action", dict(shape=[1], dtype="int64"))]
@@ -106,12 +115,13 @@ class SimpleRNNModelAC(Model):
 
 
 class SimpleRNNModelQ(Model):
-    def __init__(self, dims, num_actions, mlp):
+    def __init__(self, dims, num_actions, perception_net):
         super(SimpleRNNModelQ, self).__init__()
+        assert isinstance(dims, list) or isinstance(dims, tuple)
         self.dims = dims
         self.num_actions = num_actions
-        self.hidden_layers = mlp
-        self.hidden_size = list(mlp.children())[-2].out_features
+        self.hidden_layers = perception_net
+        self.hidden_size = list(perception_net.children())[-2].out_features
         self.value_layer = nn.Linear(self.hidden_size, num_actions)
         self.recurrent = nn.RNNCell(
             input_size=self.hidden_size,
@@ -119,7 +129,7 @@ class SimpleRNNModelQ(Model):
             nonlinearity="relu")
 
     def get_input_specs(self):
-        return [("sensor", dict(shape=[self.dims]))]
+        return [("sensor", dict(shape=self.dims))]
 
     def get_action_specs(self):
         return [("action", dict(shape=[1], dtype="int64"))]
@@ -140,18 +150,20 @@ class SimpleRNNModelQ(Model):
 
 
 class GaussianPolicyModel(Model):
-    def __init__(self, dims, action_dims, mlp, std=0.01):
+    def __init__(self, dims, action_dims, perception_net, std=0.01):
         super(GaussianPolicyModel, self).__init__()
+        assert isinstance(dims, list) or isinstance(dims, tuple)
         self.dims = dims
         self.action_dims = action_dims
         self.std = std
-        hidden_size = list(mlp.modules())[-2].out_features
-        self.policy_net = nn.Sequential(mlp,
+        hidden_size = list(perception_net.modules())[-2].out_features
+        self.policy_net = nn.Sequential(perception_net,
                                         nn.Linear(hidden_size, action_dims))
-        self.value_net = nn.Sequential(mlp, nn.Linear(hidden_size, 1))
+        self.value_net = nn.Sequential(perception_net,
+                                       nn.Linear(hidden_size, 1))
 
     def get_input_specs(self):
-        return [("sensor", dict(shape=[self.dims]))]
+        return [("sensor", dict(shape=self.dims))]
 
     def get_action_specs(self):
         return [("action", dict(shape=[self.action_dims]))]

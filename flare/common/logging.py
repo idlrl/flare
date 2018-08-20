@@ -53,10 +53,12 @@ class GameLogEntry(object):
 
 
 class GameLogger(Process):
-    def __init__(self, timeout, print_interval):
+    def __init__(self, timeout, print_interval, model_save_interval, cts):
         super(GameLogger, self).__init__()
         self.timeout = timeout
         self.print_interval = print_interval
+        self.model_save_interval = model_save_interval
+        self.cts = cts
         self.stats = {}
         self.running = Value('i', 0)
         self.log_q = Queue()
@@ -67,6 +69,10 @@ class GameLogger(Process):
         for alg_name, stats in self.stats.iteritems():
             glog.info('\n{0}:{1}'.format(alg_name, stats))
 
+    def __save_models(self, idx):
+        for ct in self.cts.values():
+            ct.save_model(idx)
+
     def __process_log(self, log):
         if not log.alg_name in self.stats:
             self.stats[log.alg_name] = log.get_stats(self.print_interval)
@@ -74,6 +80,10 @@ class GameLogger(Process):
         self.counter += 1
         if self.counter % self.print_interval == 0:
             self.__flush_log()
+            if self.counter % (self.print_interval * self.model_save_interval
+                               ) == 0:
+                self.__save_models(self.counter / self.print_interval /
+                                   self.model_save_interval)
 
     def run(self):
         self.running.value = True
