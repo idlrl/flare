@@ -165,12 +165,8 @@ class C51(SimpleQ):
                  exploration_end_steps=0,
                  exploration_end_rate=0.1,
                  update_ref_interval=100):
-
-        super(C51, self).__init__(model,
-                                  gpu_id,
-                                  discount_factor,
-                                  exploration_end_steps,
-                                  exploration_end_rate,
+        super(C51, self).__init__(model, gpu_id, discount_factor,
+                                  exploration_end_steps, exploration_end_rate,
                                   update_ref_interval)
         dead_dist = [0.] * self.model.bins
         dead_dist[0] = 1.
@@ -189,7 +185,8 @@ class C51(SimpleQ):
         :return: Tensor (batch_size x num_atoms). Q value distribution for a
             action.
         """
-        one_hot_action = comf.one_hot(action.squeeze(-1), q_distributions.size()[1])
+        one_hot_action = comf.one_hot(
+            action.squeeze(-1), q_distributions.size()[1])
         one_hot_action = one_hot_action.unsqueeze(1)
         q_distribution = torch.matmul(one_hot_action, q_distributions)
         return q_distribution.squeeze(1)
@@ -229,7 +226,8 @@ class C51(SimpleQ):
     def learn(self, inputs, next_inputs, states, next_states, next_alive,
               actions, next_actions, rewards):
 
-        if self.update_ref_interval and self.total_batches % self.update_ref_interval == 0:
+        if self.update_ref_interval \
+                and self.total_batches % self.update_ref_interval == 0:
             ## copy parameters from self.model to self.ref_model
             self.ref_model.load_state_dict(self.model.state_dict())
         self.total_batches += 1
@@ -245,15 +243,18 @@ class C51(SimpleQ):
                                                                    next_states)
             ## if not alive, Q value is the minimum.
             alpha = torch.abs(next_alive["alive"]).view(-1, 1, 1)
-            next_q_distributions = next_values["q_value"] * alpha + self.dead_dist * (1 - alpha)
-            next_expected_q_values = self.ref_model.get_expected_q_values(next_q_distributions)
+            next_q_distributions = next_values["q_value"] * alpha + \
+                                   self.dead_dist * (1 - alpha)
+            next_expected_q_values = self.ref_model.get_expected_q_values(
+                next_q_distributions)
             _, next_action = next_expected_q_values.max(-1)
             next_action = next_action.unsqueeze(-1)
 
         assert q_distributions.size() == next_q_distributions.size()
 
         q_distribution = self.select_q_distribution(q_distributions, action)
-        next_q_distribution = self.select_q_distribution(next_q_distributions, next_action)
+        next_q_distribution = self.select_q_distribution(
+            next_q_distributions, next_action)
 
         critic_value = self.backup(
             self.model.atoms,
