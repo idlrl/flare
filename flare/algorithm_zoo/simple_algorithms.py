@@ -179,11 +179,11 @@ class C51(SimpleQ):
         """
         Select a Q value distribution according to a given action.
         :param q_distributions: Tensor (batch_size x num_actions x num_atoms).
-            Q value histogram distribution for each action. The histogram has a
-            support of length num_atoms.
+            Q value distribution for each action. The histogram has a support
+            of length num_atoms.
         :param action: Tensor (batch_size x 1). Index of actions for each
             sample in a batch.
-        :return: Tensor (batch_size x num_atoms). Q value distribution for a
+        :return: Tensor (batch_size x num_atoms). Q value distribution for an
             action.
         """
         one_hot_action = comf.one_hot(
@@ -201,14 +201,14 @@ class C51(SimpleQ):
         :param z: Tensor (num_atoms). Atoms.
         :param vmax: FloatTensor (1). Maximum value for the distribution.
         :param vmin: FloatTensor (1). Minumum value for the distribution.
-        :param delta_z: float. size of bin for the distribution.
+        :param delta_z: float. Size of bin for the distribution.
         :param reward: Tensor (batch_size, 1). Reward function.
         :param discount: float. Discount factor.
         :param next_q_distribution: Tensor (batch_size x num_atoms). Q value
             distribution.
         :return: Tensor (batch_size x num_atoms). Q value distribution.
         """
-        ## Compute the projection of Tz onto the zupport z
+        ## Compute the projection of Tz onto the support z
         Tz = reward + discount * z
         Tz = torch.min(Tz, vmax)
         Tz = torch.max(Tz, vmin)
