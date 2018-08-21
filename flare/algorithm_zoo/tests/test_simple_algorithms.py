@@ -50,8 +50,9 @@ class TestC51(unittest.TestCase):
         model = SimpleModelC51(
             dims=None, num_actions=None, mlp=None, vmax=10, vmin=-10, bins=2)
 
-        alg = C51(
-            model=model, exploration_end_steps=500000, update_ref_interval=100)
+        alg = C51(model=model,
+                  exploration_end_steps=500000,
+                  update_ref_interval=100)
 
         discount = 0.9
         reward = [[1.5], [-0.2], [0.]]
@@ -63,9 +64,10 @@ class TestC51(unittest.TestCase):
         ]).flatten()
 
         actual = alg.backup(
-            model.atoms, torch.FloatTensor([model.vmax]),
-            torch.FloatTensor([model.vmin]),
-            model.delta_z, torch.tensor(reward), discount,
+            model.atoms,
+            torch.FloatTensor([model.vmax]),
+            torch.FloatTensor([model.vmin]), model.delta_z,
+            torch.tensor(reward), discount,
             torch.tensor(next_q_distribution)).numpy().flatten()
 
         self.assertEqual(len(expected), len(actual))
