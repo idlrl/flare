@@ -187,8 +187,7 @@ class C51(SimpleQ):
             action.
         """
         one_hot_action = comf.one_hot(
-            action.squeeze(-1),
-            q_distributions.size()[1])
+            action.squeeze(-1), q_distributions.size()[1])
         one_hot_action = one_hot_action.unsqueeze(1)
         q_distribution = torch.matmul(one_hot_action, q_distributions)
         return q_distribution.squeeze(1)
@@ -242,8 +241,8 @@ class C51(SimpleQ):
         q_distributions = values["q_value"]
 
         with torch.no_grad():
-            next_values, next_states_update = self.ref_model.value(
-                next_inputs, next_states)
+            next_values, next_states_update = self.ref_model.value(next_inputs,
+                                                                   next_states)
             ## if not alive, Q value is the minimum.
             alpha = torch.abs(next_alive["alive"]).view(-1, 1, 1)
             next_q_distributions = next_values["q_value"] * alpha + \
@@ -256,8 +255,8 @@ class C51(SimpleQ):
         assert q_distributions.size() == next_q_distributions.size()
 
         q_distribution = self.select_q_distribution(q_distributions, action)
-        next_q_distribution = self.select_q_distribution(
-            next_q_distributions, next_action)
+        next_q_distribution = self.select_q_distribution(next_q_distributions,
+                                                         next_action)
 
         critic_value = self.backup(self.model.atoms, self.float_vmax,
                                    self.float_vmin, self.model.delta_z, reward,
