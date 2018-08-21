@@ -11,16 +11,10 @@ class TestC51(unittest.TestCase):
         """
         Test case for selecting a Q distribution with an action.
         """
-        alg = C51(
-            model=SimpleModelC51(
-                dims=None,
-                num_actions=None,
-                mlp=None,
-                vmax=10,
-                vmin=-10,
-                bins=2),
-            exploration_end_steps=500000,
-            update_ref_interval=100)
+        alg = C51(model=SimpleModelC51(
+            dims=None, num_actions=None, mlp=None, vmax=10, vmin=-10, bins=2),
+                  exploration_end_steps=500000,
+                  update_ref_interval=100)
 
         distribution = [[[0.1, 0.9], [0.2, 0.8], [0.3, 0.7]],
                         [[0.4, 0.6], [0.5, 0.5], [0.6, 0.4]]]
@@ -29,8 +23,7 @@ class TestC51(unittest.TestCase):
         expected = np.array(
             [d[a] for d, a in zip(distribution, action)]).flatten()
         actual = alg.select_q_distribution(
-            torch.tensor(distribution),
-            torch.tensor(action)).numpy().flatten()
+            torch.tensor(distribution), torch.tensor(action)).numpy().flatten()
 
         self.assertEqual(len(expected), len(actual))
         for x, y in zip(expected, actual):
