@@ -175,8 +175,8 @@ class GaussianPolicyModel(Model):
         self.action_dims = action_dims
         self.std = std
         hidden_size = list(mlp.modules())[-2].out_features
-        self.policy_net = nn.Sequential(mlp,
-                                        nn.Linear(hidden_size, action_dims))
+        self.policy_net = nn.Sequential(mlp, nn.Linear(hidden_size,
+                                                       action_dims))
         self.value_net = nn.Sequential(mlp, nn.Linear(hidden_size, 1))
 
     def get_input_specs(self):

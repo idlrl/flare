@@ -5,6 +5,7 @@ import math
 import torch
 import unittest
 
+
 class TestC51(unittest.TestCase):
     def test_select_q_distribution(self):
         """
@@ -21,9 +22,8 @@ class TestC51(unittest.TestCase):
             exploration_end_steps=500000,
             update_ref_interval=100)
 
-        distribution = [
-            [[0.1, 0.9], [0.2, 0.8], [0.3, 0.7]],
-            [[0.4, 0.6], [0.5, 0.5], [0.6, 0.4]]]
+        distribution = [[[0.1, 0.9], [0.2, 0.8], [0.3, 0.7]],
+                        [[0.4, 0.6], [0.5, 0.5], [0.6, 0.4]]]
         action = [0, 2]
 
         expected = np.array(
@@ -55,33 +55,24 @@ class TestC51(unittest.TestCase):
         Test case for backup.
         """
         model = SimpleModelC51(
-            dims=None,
-            num_actions=None,
-            mlp=None,
-            vmax=10,
-            vmin=-10,
-            bins=2)
+            dims=None, num_actions=None, mlp=None, vmax=10, vmin=-10, bins=2)
 
         alg = C51(
-            model=model,
-            exploration_end_steps=500000,
-            update_ref_interval=100)
+            model=model, exploration_end_steps=500000, update_ref_interval=100)
 
         discount = 0.9
         reward = [[1.5], [-0.2], [0.]]
         next_q_distribution = [[0.1, 0.9], [0.2, 0.8], [0.3, 0.7]]
 
-        expected = np.array([self.one_backup(
-            r[0], q, discount, model) for r, q in zip(
-            reward, next_q_distribution)]).flatten()
+        expected = np.array([
+            self.one_backup(r[0], q, discount, model)
+            for r, q in zip(reward, next_q_distribution)
+        ]).flatten()
 
         actual = alg.backup(
-            model.atoms,
-            torch.FloatTensor([model.vmax]),
+            model.atoms, torch.FloatTensor([model.vmax]),
             torch.FloatTensor([model.vmin]),
-            model.delta_z,
-            torch.tensor(reward),
-            discount,
+            model.delta_z, torch.tensor(reward), discount,
             torch.tensor(next_q_distribution)).numpy().flatten()
 
         self.assertEqual(len(expected), len(actual))

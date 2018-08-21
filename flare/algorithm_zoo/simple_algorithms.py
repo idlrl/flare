@@ -34,10 +34,10 @@ class SimpleAC(Algorithm):
         value = values["v_value"]
 
         with torch.no_grad():
-            next_values, next_states_update = self.model.value(next_inputs,
-                                                               next_states)
-            next_value = next_values["v_value"] * torch.abs(next_alive[
-                "alive"])
+            next_values, next_states_update = self.model.value(
+                next_inputs, next_states)
+            next_value = next_values["v_value"] * torch.abs(
+                next_alive["alive"])
 
         assert value.size() == next_value.size()
 
@@ -134,10 +134,10 @@ class SimpleQ(Algorithm):
         q_value = values["q_value"]
 
         with torch.no_grad():
-            next_values, next_states_update = self.ref_model.value(next_inputs,
-                                                                   next_states)
-            next_q_value = next_values["q_value"] * torch.abs(next_alive[
-                "alive"])
+            next_values, next_states_update = self.ref_model.value(
+                next_inputs, next_states)
+            next_q_value = next_values["q_value"] * torch.abs(
+                next_alive["alive"])
             next_value, _ = next_q_value.max(-1)
             next_value = next_value.unsqueeze(-1)
 
@@ -158,6 +158,7 @@ class C51(SimpleQ):
 
     self.model should have members defined in SimpleModelC51 class.
     """
+
     def __init__(self,
                  model,
                  gpu_id=-1,
@@ -186,18 +187,20 @@ class C51(SimpleQ):
             action.
         """
         one_hot_action = comf.one_hot(
-            action.squeeze(-1), q_distributions.size()[1])
+            action.squeeze(-1),
+            q_distributions.size()[1])
         one_hot_action = one_hot_action.unsqueeze(1)
         q_distribution = torch.matmul(one_hot_action, q_distributions)
         return q_distribution.squeeze(1)
 
-    def backup(self, z, vmax, vmin, delta_z, reward, discount, next_q_distribution):
+    def backup(self, z, vmax, vmin, delta_z, reward, discount,
+               next_q_distribution):
         """
         Backup sampled reward and reference q value distribution to current q
         value ditribution.
         :param z: Tensor (num_atoms). Atoms.
-        :param vmax: float. Maximum value for the distribution.
-        :param vmin: float. Minumum value for the distribution.
+        :param vmax: FloatTensor (1). Maximum value for the distribution.
+        :param vmin: FloatTensor (1). Minumum value for the distribution.
         :param delta_z: float. size of bin for the distribution.
         :param reward: Tensor (batch_size, 1). Reward function.
         :param discount: float. Discount factor.
@@ -239,8 +242,8 @@ class C51(SimpleQ):
         q_distributions = values["q_value"]
 
         with torch.no_grad():
-            next_values, next_states_update = self.ref_model.value(next_inputs,
-                                                                   next_states)
+            next_values, next_states_update = self.ref_model.value(
+                next_inputs, next_states)
             ## if not alive, Q value is the minimum.
             alpha = torch.abs(next_alive["alive"]).view(-1, 1, 1)
             next_q_distributions = next_values["q_value"] * alpha + \
@@ -256,13 +259,9 @@ class C51(SimpleQ):
         next_q_distribution = self.select_q_distribution(
             next_q_distributions, next_action)
 
-        critic_value = self.backup(
-            self.model.atoms,
-            self.float_vmax,
-            self.float_vmin,
-            self.model.delta_z,
-            reward, self.discount_factor,
-            next_q_distribution)
+        critic_value = self.backup(self.model.atoms, self.float_vmax,
+                                   self.float_vmin, self.model.delta_z, reward,
+                                   self.discount_factor, next_q_distribution)
 
         ## Cross-entropy loss
         cost = -torch.matmul(
@@ -294,8 +293,8 @@ class SimpleSARSA(SimpleQ):
         q_value = values["q_value"]
 
         with torch.no_grad():
-            next_values, next_states_update = self.model.value(next_inputs,
-                                                               next_states)
+            next_values, next_states_update = self.model.value(
+                next_inputs, next_states)
             next_value = comf.idx_select(next_values["q_value"], next_action)
             next_value = next_value * torch.abs(next_alive["alive"])
 
@@ -327,9 +326,8 @@ class OffPolicyAC(Algorithm):
 
     def get_action_specs(self):
         ### "action_log_prob" is required by the algorithm but not by the model
-        return self.model.get_action_specs() + [
-            ("action_log_prob", dict(shape=[1]))
-        ]
+        return self.model.get_action_specs() + [("action_log_prob",
+                                                 dict(shape=[1]))]
 
     def learn(self, inputs, next_inputs, states, next_states, next_alive,
               actions, next_actions, rewards):
@@ -345,10 +343,10 @@ class OffPolicyAC(Algorithm):
         value = values["v_value"]
 
         with torch.no_grad():
-            next_values, next_states_update = self.model.value(next_inputs,
-                                                               next_states)
-            next_value = next_values["v_value"] * torch.abs(next_alive[
-                "alive"])
+            next_values, next_states_update = self.model.value(
+                next_inputs, next_states)
+            next_value = next_values["v_value"] * torch.abs(
+                next_alive["alive"])
 
         assert value.size() == next_value.size()
 
@@ -370,8 +368,9 @@ class OffPolicyAC(Algorithm):
         clipped_ratio = torch.clamp(
             ratio, min=1 - self.epsilon, max=1 + self.epsilon)
 
-        pg_obj = torch.min(input=ratio * td_error.detach(),
-                           other=clipped_ratio * td_error.detach())
+        pg_obj = torch.min(
+            input=ratio * td_error.detach(),
+            other=clipped_ratio * td_error.detach())
         cost = self.value_cost_weight * value_cost - pg_obj
 
         return dict(cost=cost.unsqueeze(-1)), states_update, next_states_update

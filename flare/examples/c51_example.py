@@ -28,10 +28,9 @@ if __name__ == '__main__':
     #    Here we use a small MLP and apply the Q-learning algorithm
     inner_size = 256
     mlp = nn.Sequential(
-        nn.Linear(state_shape, inner_size),
-        nn.ReLU(),
-        nn.Linear(inner_size, inner_size),
-        nn.ReLU(), nn.Linear(inner_size, inner_size), nn.ReLU())
+        nn.Linear(state_shape, inner_size), nn.ReLU(),
+        nn.Linear(inner_size, inner_size), nn.ReLU(),
+        nn.Linear(inner_size, inner_size), nn.ReLU())
 
     alg = C51(
         model=SimpleModelC51(
@@ -48,7 +47,8 @@ if __name__ == '__main__':
     # in this case), data sampling strategy (OnPolicyHelper here) and other
     # settings used by ComputationTask.
     ct_settings = {
-        "RL": dict(
+        "RL":
+        dict(
             num_agents=num_agents,
             algorithm=alg,
             hyperparas=dict(lr=1e-4),
