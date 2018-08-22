@@ -103,6 +103,11 @@ class SimpleModelQRDQN(SimpleModelC51):
         super(SimpleModelQRDQN, self).__init__(dims, num_actions, mlp, 10, -10, N)
         self.N = N
 
+    def value(self, inputs, states):
+        q_distributions = self.mlp(inputs.values()[0])
+        q_distributions = q_distributions.view(-1, self.num_actions, self.bins)
+        return dict(q_value=q_distributions), states
+
     def get_expected_q_values(self, q_distribution):
         return q_distribution.mean(-1)
 
