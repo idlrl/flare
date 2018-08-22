@@ -258,9 +258,6 @@ class Agent(Process):
     def predict(self, alg_name, inputs, states=dict()):
         return self.helpers[alg_name].predict(inputs, states)
 
-    def learn(self, alg_name):
-        self.helpers[alg_name].learn()
-
     def run(self):
         """
         Default entry function of Agent process.

@@ -74,7 +74,7 @@ class SimpleModelDeterministic(Model):
 ```
 
 ## Algorithm <a name="algorithm"/>
-The `Algorithm` class implements the prediction and training logic based on a `Model`. It decides which functions of the model to call for prediction, and which functions to call for learning the network parameters. Besides the forward and backward logic, sometimes an `Algorithm` has additional logic of manipulating the model. For example, the `SimpleQ` algorithm periodically copies the training model to a reference model in its `learn()` to stabilize the training.
+The `Algorithm` class implements the prediction and training logic based on a `Model`. It decides which functions of the model to call for prediction, and which functions to call for learning the network parameters. Besides the forward and backward logic, sometimes an `Algorithm` could have additional logic of manipulating the model. For example, the `SimpleQ` algorithm periodically copies the training model to a reference model in its `learn()` to stabilize the training.
 
 An `Algorithm` might be reused in different scenarios. For example, given a fixed `SimpleQ` algorithm implementation, we can easily apply it to either an MLP model or a CNN model to account for different observation inputs, without changing the learning objective (both use Q-learning).
 
@@ -132,8 +132,65 @@ class TestAlgorithm(Algorithm):
 ```
 
 ## Computation Task <a name="ct"/>
+`ComputationTask` (CT) is designed to be a relatively independent task an agent performs. A CT will contain an `Algorithm` object which in turns contain a `Model` object. A CT has the following steps in its `predict()` or `learn()`:
+
+1. Convert input Numpy arrays into PyTorch tensors. During conversion, it obtains input/output specs information from the model of the algorithm.
+2. Call the algorithm's `predict()` or `learn()`.
+3. Detach and convert the PyTorch tensors output by the algorithm back to Numpy arrays.
+
+The agent might have multiple CTs at the same time. It is assumed that there is no gradient flowing between two different CTs. However, different CTs may share common model parameters if their algorithms contain a (partially) common `Model`. It should be noted that each CT has its own training data buffer and/or data sampling schedule. For example, one CT might be a standard RL task that maximizes the episodic reward, while a second CT might be an auxiliary task that tries to predict immediate rewards only when the reward is non-trivial (i.e., balanced data for supervised learning). Another scenario that needs multiple CTs is hierarchical RL where a CT outputs a goal at a higher level and another CT generates actions given the goal for a certain amount of time steps.
+
+If there are multiple CTs, the agent is responsible for implementing the calling order of them in its function `_cts_predict()`. The agent is also responsible for implementing when and what to store for each CT in `_cts_store_data`. See more details in the section [Agent](#agent).
+
+Usually a single CT is enough in most scenarios. If there are several costs for your model and they can be optimized together with the same data collection schedule, then it is suggested to define only one CT and put all the costs in its algorithm's `learn()`.
+
+#### Learning and prediction arguments
+The function signatures of CT's `predict()` and `learn()` are
+```python
+def predict(self, inputs, states=None):
+    ...
+    return pred_actions, pred_states
+
+def learn(self,
+          inputs,
+          next_inputs,
+          next_alive,
+          rewards,
+          actions,
+          next_actions=None,
+          states=None,
+          next_states=None):
+    ...
+    return costs
+```
+At this moment, these two signatures are fixed: the user has no official way to change them. The reason is simple: we believe that these input/output designs are general enough for the possible scenarios we can think of.
+
+Each argument showing above is a dictionary, meaning that it can be a collection of different quantities. The dictionary keys will match the keys of the specs defined by the `Model`. For example, if the model defines
+```python
+def get_input_specs(self):
+    return [("sensor", dict(shape=self.dims))]
+```
+Then in both `predict()` and `learn()`, the user can expect to get the corresponding inputs by `inputs["sensor"]`.
+
+For now, let's skip the explanations for `states`, `pred_states` and `next_states`. They are only needed if the agent has short-term temporal memory. In that case, we refer the reader to [Short-term Temporal Memory](memory.md) for details. The rest of the arguments are explained below:
+
+Predict:
+* `inputs`: the observation inputs at the current time step
+* `pred_actions`: the predicted actions given `inputs`
+
+Learn:
+* `inputs`: the observation inputs at the current time step
+* `actions`: the actions the agent took given `inputs`
+* `rewards`: the rewards the agent received by taking `actions`
+* `next_inputs`: the observation inputs at the next time step after taking `actions`
+* `next_alive`: whether the agent is alive at the next time step
+* `next_actions`: the actions the agent took given `next_inputs`
+
+#### No PyTorch code outside CT
+For an agent, each CT is a neural blackbox. A CT receives numpy arrays and outputs numpy arrays. Thus the agent does not have to be aware of the existence of PyTorch. In this sense, the implementation of CT potentially can be replaced by other deep learning frameworks such as TensorFlow. Going beyond CT, all the other code is pure Python.
 
 ## Computation Data Processor <a name="cdp"/>
+`ComputationDataProcessor` (CDP) is a data feeder class designed for `ComputationTask`. Every CT is associated with its own CDP. In the case where we want to use multiple identical agents to speed up the data collection for a CT, the associated CDP is responsible for packing and unpacking multi-agent data. Its job is to record which experiences are from which agents in a learning/prediction batch, in order to return the results to the correct agents after the computations of the CT. A CDP directly communicates with multiple agents and maintains two loops: `_prediction_loop()` and `_training_loop`.
 
 ## Agent <a name="agent"/>
 
