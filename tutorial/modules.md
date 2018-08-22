@@ -190,7 +190,9 @@ Learn:
 For an agent, each CT is a neural blackbox. A CT receives numpy arrays and outputs numpy arrays. Thus the agent does not have to be aware of the existence of PyTorch. In this sense, the implementation of CT potentially can be replaced by other deep learning frameworks such as TensorFlow. Going beyond CT, all the other code is pure Python.
 
 ## Computation Data Processor <a name="cdp"/>
-`ComputationDataProcessor` (CDP) is a data feeder class designed for `ComputationTask`. Every CT is associated with its own CDP. In the case where we want to use multiple identical agents to speed up the data collection for a CT, the associated CDP is responsible for packing and unpacking multi-agent data. Its job is to record which experiences are from which agents in a learning/prediction batch, in order to return the results to the correct agents after the computations of the CT. A CDP directly communicates with multiple agents and maintains two loops: `_prediction_loop()` and `_training_loop`.
+`ComputationDataProcessor` (CDP) is a data feeder class designed for `ComputationTask`. Every CT is associated with its own CDP. In the case where we want to use multiple identical agents to speed up the data collection for a CT, the associated CDP is responsible for packing and unpacking multi-agent data. Its job is to record which experiences are from which agents in a learning/prediction batch, in order to return the results to the correct agents after the computations of the CT. A CDP directly communicates with multiple agents, and maintains two loops: `_prediction_loop()` and `_training_loop()` until program termination.
+
+![](image/agent_cdp_ct.jpg)
 
 ## Agent <a name="agent"/>
 
