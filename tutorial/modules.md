@@ -73,7 +73,7 @@ class SimpleModelDeterministic(Model):
         return dict(continuous_action=Deterministic(hidden)), states
 ```
 
-## Algorithm <a name="alg"/>
+## Algorithm <a name="algorithm"/>
 The `Algorithm` class implements the prediction and training logic based on a `Model`. It decides which functions of the model to call for prediction, and which functions to call for learning the network parameters. Besides the forward and backward logic, sometimes an `Algorithm` has additional logic of manipulating the model. For example, the `SimpleQ` algorithm periodically copies the training model to a reference model in its `learn()` to stabilize the training.
 
 An `Algorithm` might be reused in different scenarios. For example, given a fixed `SimpleQ` algorithm implementation, we can easily apply it to either an MLP model or a CNN model to account for different observation inputs, without changing the learning objective (both use Q-learning).
