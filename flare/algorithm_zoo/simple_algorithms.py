@@ -270,6 +270,75 @@ class C51(SimpleQ):
         return dict(cost=cost), states_update, next_states_update
 
 
+class QRDQN(C51):
+    """
+    Quantile Regression DQN (QR-DQN) based on C51.
+    Refer to https://arxiv.org/pdf/1710.10044.pdf for more details.
+    "Distributional Reinforcement Learning with Quantile Regression"
+
+    self.model should have members defined in SimpleQRDQN class.
+    """
+
+    def __init__(self,
+                 model,
+                 gpu_id=-1,
+                 discount_factor=0.99,
+                 exploration_end_steps=0,
+                 exploration_end_rate=0.1,
+                 update_ref_interval=100):
+        super(QRDQN, self).__init__(model, gpu_id, discount_factor,
+                                  exploration_end_steps, exploration_end_rate,
+                                  update_ref_interval)
+        N = self.model.N
+        self.tau_hat = torch.tensor([(2 * i + 1.) / (2 * N) for i in xrange(N)]).view(1, -1)
+        self.loss = torch.nn.SmoothL1Loss(reduce=False)
+
+    def learn(self, inputs, next_inputs, states, next_states, next_alive,
+              actions, next_actions, rewards):
+
+        if self.update_ref_interval \
+                and self.total_batches % self.update_ref_interval == 0:
+            ## copy parameters from self.model to self.ref_model
+            self.ref_model.load_state_dict(self.model.state_dict())
+        self.total_batches += 1
+
+        action = actions["action"]
+        reward = rewards["reward"]
+
+        values, states_update = self.model.value(inputs, states)
+        q_distributions = values["q_value"]
+
+        with torch.no_grad():
+            next_values, next_states_update = self.ref_model.value(next_inputs,
+                                                                   next_states)
+            ## if not alive, Q value is the minimum.
+            alpha = torch.abs(next_alive["alive"]).view(-1, 1, 1)
+            next_q_distributions = next_values["q_value"] * alpha + \
+                                   self.dead_dist * (1 - alpha)
+            next_expected_q_values = self.ref_model.get_expected_q_values(
+                next_q_distributions)
+            _, next_action = next_expected_q_values.max(-1)
+            next_action = next_action.unsqueeze(-1)
+
+        assert q_distributions.size() == next_q_distributions.size()
+
+        q_distribution = self.select_q_distribution(q_distributions, action)
+        next_q_distribution = self.select_q_distribution(next_q_distributions,
+                                                         next_action)
+
+        critic_value = reward + self.discount_factor * next_q_distribution
+
+        ## Quantile Huber loss
+        huber_loss = self.loss(q_distribution, critic_value)
+        u = critic_value - q_distribution
+        delta = (u < 0).float()
+        asymmetric = torch.abs(self.tau_hat - delta)
+        quantile_huber_loss = asymmetric * huber_loss
+        cost = quantile_huber_loss.mean(-1, keepdim=True)
+
+        return dict(cost=cost), states_update, next_states_update
+
+
 class SimpleSARSA(SimpleQ):
     def __init__(self, model, gpu_id=-1, discount_factor=0.99, epsilon=0.1):
 

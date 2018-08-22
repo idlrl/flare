@@ -97,6 +97,15 @@ class SimpleModelC51(SimpleModelQ):
         return torch.matmul(q_distribution, self.atoms)
 
 
+class SimpleModelQRDQN(SimpleModelC51):
+    def __init__(self, dims, num_actions, mlp, N):
+        super(SimpleModelQRDQN, self).__init__(dims, num_actions, mlp, 10, -10, N)
+        self.N = N
+
+    def get_expected_q_values(self, q_distribution):
+        return q_distribution.mean(-1)
+
+
 class SimpleRNNModelAC(Model):
     def __init__(self, dims, num_actions, mlp):
         super(SimpleRNNModelAC, self).__init__()
