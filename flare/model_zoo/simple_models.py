@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical, MultivariateNormal
+import math
 
 
 class SimpleModelDeterministic(Model):
@@ -104,6 +105,39 @@ class SimpleModelQRDQN(SimpleModelC51):
 
     def get_expected_q_values(self, q_distribution):
         return q_distribution.mean(-1)
+
+
+class SimpleModelIQN(SimpleModelQRDQN):
+    def __init__(self, dims, num_actions, mlp, inner_size, K=32, n=64):
+        super(SimpleModelIQN, self).__init__(dims, num_actions, mlp, K)
+        self.K = K
+        self.inner_size = inner_size
+        self.pi_base = torch.tensor([math.pi * i for i in xrange(n)]).view(1, -1)
+        self.phi_mlp = nn.Sequential(
+            nn.Linear(n, self.inner_size),
+            nn.ReLU())
+        self.f = nn.Linear(self.inner_size, num_actions)
+
+    def get_phi(self, batch_size, N):
+        tau = torch.rand(batch_size, N)
+        x = tau.view(-1, 1) * self.pi_base
+        x = x.cos()
+        phi = self.phi_mlp(x)
+        phi = phi.view(batch_size, N, -1)
+        return phi, tau
+
+    def value(self, inputs, states, N=None):
+        if N is None:
+            N = self.K
+        psi = self.mlp(inputs.values()[0])
+        psi = psi.view(-1, 1, self.inner_size)
+        phi, tau = self.get_phi(psi.size()[0], N)
+        Z = psi * phi
+        Z = Z.view(-1, self.inner_size)
+        q_values = self.f(Z)
+        q_values = q_values.view(-1, N, self.num_actions)
+        q_values = q_values.transpose(1, 2)
+        return dict(q_value=q_values, tau=tau), states
 
 
 class SimpleRNNModelAC(Model):
