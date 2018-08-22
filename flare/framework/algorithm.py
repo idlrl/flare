@@ -158,7 +158,7 @@ class Algorithm(object):
               actions, next_actions, rewards):
         """
         This function computes a learning cost to be optimized.
-        The return should be the cost.
+        The return should be the cost and updated states.
         Output: cost(dict), states(dict)
 
         Optional: an algorithm might not implement learn()
