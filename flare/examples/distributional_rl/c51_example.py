@@ -21,14 +21,14 @@ if __name__ == '__main__':
     envs = []
     for _ in range(num_agents):
         envs.append(GymEnv(game))
-    state_shape = envs[-1].observation_space.shape[0]
-    num_actions = envs[-1].action_space.n
+    state_shape = envs[-1].observation_dims()[0]
+    num_actions = envs[-1].action_dims()[0]
 
     # 2. Construct the network and specify the algorithm.
     #    Here we use a small MLP and apply the Q-learning algorithm
     inner_size = 256
     mlp = nn.Sequential(
-        nn.Linear(state_shape, inner_size),
+        nn.Linear(state_shape[0], inner_size),
         nn.ReLU(),
         nn.Linear(inner_size, inner_size),
         nn.ReLU(), nn.Linear(inner_size, inner_size), nn.ReLU())
@@ -36,7 +36,7 @@ if __name__ == '__main__':
     alg = C51(model=SimpleModelC51(
         dims=state_shape,
         num_actions=num_actions,
-        mlp=nn.Sequential(mlp, nn.Linear(inner_size, num_actions * bins)),
+        perception_net=mlp,
         vmax=vmax,
         vmin=vmin,
         bins=bins),
@@ -65,8 +65,9 @@ if __name__ == '__main__':
     # 5. Spawn one agent for each instance of environment.
     #    Agent's behavior depends on the actual algorithm being used. Since we
     #    are using SimpleAC, a proper type of Agent is SimpleRLAgent.
+    reward_shaping_f = lambda x: x / 100.0
     for env in envs:
-        agent = SimpleRLAgent(env, num_games)
+        agent = SimpleRLAgent(env, num_games, reward_shaping_f)
         # An Agent has to be added into the Manager before we can use it to
         # interact with environment and collect data
         manager.add_agent(agent)

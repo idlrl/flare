@@ -33,12 +33,12 @@ class DistributionalAlgorithm(SimpleQ):
         action = actions["action"]
         reward = rewards["reward"]
 
-        values, states_update = self.get_current_value(inputs, states)
-        q_lists = values["q_value_list"]
+        values, states_update = self.model.value(inputs, states)
+        q_lists = values["q_value_distribution"]
 
         with torch.no_grad():
-            next_values, next_states_update = self.get_next_value(next_inputs,
-                                                                  next_states)
+            next_values, next_states_update = self.ref_model.value(next_inputs,
+                                                                   next_states)
             next_q_lists = self.check_alive(next_values, next_alive)
             next_expected_q_values = next_values["q_value"]
             _, next_action = next_expected_q_values.max(-1)
@@ -50,13 +50,10 @@ class DistributionalAlgorithm(SimpleQ):
         next_q_list = self.select_q_distribution(next_q_lists, next_action)
 
         cost = self.get_cost(q_list, next_q_list, reward, values, next_values)
+        avg_cost = comf.get_avg_cost(cost)
+        avg_cost.backward(retain_graph=True)
+
         return dict(cost=cost), states_update, next_states_update
-
-    def get_current_value(self, inputs, states):
-        return self.model.value(inputs, states)
-
-    def get_next_value(self, next_inputs, next_states):
-        return self.ref_model.value(next_inputs, next_states)
 
     def check_alive(self, next_values, next_alive):
         pass
@@ -77,15 +74,15 @@ class C51(DistributionalAlgorithm):
                                   exploration_end_steps, exploration_end_rate,
                                   update_ref_interval)
         dead_dist = [0.] * self.model.bins
-        dead_dist[0] = 1.
+        dead_dist[len(dead_dist) / 2] = 1.
         self.dead_dist = torch.tensor(dead_dist)
         self.float_vmax = torch.FloatTensor([model.vmax])
         self.float_vmin = torch.FloatTensor([model.vmin])
 
     def check_alive(self, next_values, next_alive):
-        ## if not alive, Q value is the minimum.
+        ## if not alive, Q value is deterministically the 0.
         alpha = torch.abs(next_alive["alive"]).view(-1, 1, 1)
-        next_q_distributions = next_values["q_value_list"] * alpha + \
+        next_q_distributions = next_values["q_value_distribution"] * alpha + \
                                self.dead_dist * (1 - alpha)
         return next_q_distributions
 
@@ -146,7 +143,7 @@ class QuantileAlgorithm(DistributionalAlgorithm):
         self.loss = torch.nn.SmoothL1Loss(reduce=False)
 
     def check_alive(self, next_values, next_alive):
-        next_q_distributions = next_values["q_value_list"] * torch.abs(
+        next_q_distributions = next_values["q_value_distribution"] * torch.abs(
             next_alive["alive"].view(-1, 1, 1))
         return next_q_distributions
 
@@ -210,6 +207,8 @@ class IQN(QuantileAlgorithm):
         super(IQN, self).__init__(model, gpu_id, discount_factor,
                                   exploration_end_steps, exploration_end_rate,
                                   update_ref_interval)
+        self.model.N = N
+        self.ref_model.N = N_prime
         self.N = N
         self.next_N = N_prime
 
@@ -226,9 +225,3 @@ class IQN(QuantileAlgorithm):
         cost = self.get_quantile_huber_loss(critic_value, q_distribution, tau)
         cost = cost.squeeze(1).sum(-1, keepdim=True)
         return cost
-
-    def get_current_value(self, inputs, states):
-        return self.model.value(inputs, states, self.N)
-
-    def get_next_value(self, next_inputs, next_states):
-        return self.ref_model.value(next_inputs, next_states, self.next_N)

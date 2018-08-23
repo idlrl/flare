@@ -3,6 +3,7 @@ from flare.model_zoo.distributional_rl_models import SimpleModelC51
 import numpy as np
 import math
 import torch
+import torch.nn as nn
 import unittest
 
 
@@ -11,8 +12,17 @@ class TestC51(unittest.TestCase):
         """
         Test case for selecting a Q distribution with an action.
         """
+        inner_size = 256
+        num_actions = 3
+        state_shape = [1]
+        mlp = nn.Sequential(nn.Linear(inner_size, inner_size), nn.ReLU())
         alg = C51(model=SimpleModelC51(
-            dims=None, num_actions=None, mlp=None, vmax=10, vmin=-10, bins=2),
+            dims=state_shape,
+            num_actions=num_actions,
+            perception_net=mlp,
+            vmax=10,
+            vmin=-10,
+            bins=2),
                   exploration_end_steps=500000,
                   update_ref_interval=100)
 
@@ -47,9 +57,17 @@ class TestC51(unittest.TestCase):
         """
         Test case for backup.
         """
+        inner_size = 256
+        num_actions = 3
+        state_shape = [1]
+        mlp = nn.Sequential(nn.Linear(inner_size, inner_size), nn.ReLU())
         model = SimpleModelC51(
-            dims=None, num_actions=None, mlp=None, vmax=10, vmin=-10, bins=2)
-
+            dims=state_shape,
+            num_actions=num_actions,
+            perception_net=mlp,
+            vmax=10,
+            vmin=-10,
+            bins=2)
         alg = C51(model=model,
                   exploration_end_steps=500000,
                   update_ref_interval=100)
