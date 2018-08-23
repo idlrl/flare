@@ -371,6 +371,7 @@ class IQN(QuantileAlgorithm):
         critic_value = critic_value.unsqueeze(-1).expand(batch_size, self.next_N, self.N)
 
         cost = self.get_quantile_huber_loss(critic_value, q_distribution, tau)
+        cost = cost.squeeze(1).sum(-1, keepdim=True)
         return cost
 
     def get_current_value(self, inputs, states):
