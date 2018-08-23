@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import unittest
 
+
 class DummyInput():
     def __init__(self, batch_size, state_shape):
         self.batch_size = batch_size
@@ -10,6 +11,7 @@ class DummyInput():
 
     def values(self):
         return [torch.randn(self.batch_size, self.state_shape)]
+
 
 class TestSimpleModelIQN(unittest.TestCase):
     def test_get_phi(self):
@@ -22,11 +24,7 @@ class TestSimpleModelIQN(unittest.TestCase):
         K = 32
         N = 8
         model = SimpleModelIQN(
-            dims=1,
-            num_actions=3,
-            mlp=None,
-            inner_size=inner_size,
-            K=K)
+            dims=1, num_actions=3, mlp=None, inner_size=inner_size, K=K)
         phi, tau = model.get_phi(batch_size, N)
         self.assertEqual((batch_size, N, inner_size), phi.size())
         self.assertEqual((batch_size, N), tau.size())
@@ -53,7 +51,8 @@ class TestSimpleModelIQN(unittest.TestCase):
             K=K)
         value, a_state = model.value(dm, state, N)
         self.assertEqual(state, a_state)
-        self.assertEqual((batch_size, num_actions, N), value["q_value_list"].size())
+        self.assertEqual((batch_size, num_actions, N),
+                         value["q_value_list"].size())
 
 
 if __name__ == "__main__":

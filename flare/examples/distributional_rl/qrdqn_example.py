@@ -33,13 +33,14 @@ if __name__ == '__main__':
         nn.Linear(inner_size, inner_size),
         nn.ReLU(), nn.Linear(inner_size, inner_size), nn.ReLU())
 
-    alg = QRDQN(model=SimpleModelQRDQN(
-        dims=state_shape,
-        num_actions=num_actions,
-        mlp=nn.Sequential(mlp, nn.Linear(inner_size, num_actions * bins)),
-        N=bins),
-              exploration_end_steps=500000 / num_agents,
-              update_ref_interval=100)
+    alg = QRDQN(
+        model=SimpleModelQRDQN(
+            dims=state_shape,
+            num_actions=num_actions,
+            mlp=nn.Sequential(mlp, nn.Linear(inner_size, num_actions * bins)),
+            N=bins),
+        exploration_end_steps=500000 / num_agents,
+        update_ref_interval=100)
 
     # 3. Specify the settings for learning: the algorithm to use (SimpleAC
     # in this case), data sampling strategy (OnPolicyHelper here) and other

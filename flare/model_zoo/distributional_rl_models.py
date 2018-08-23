@@ -26,7 +26,6 @@ class SimpleModelC51(SimpleModelQ):
         return dict(q_value=q_values, q_value_list=q_distributions), states
 
 
-
 class SimpleModelQRDQN(SimpleModelQ):
     def __init__(self, dims, num_actions, mlp, N):
         super(SimpleModelQRDQN, self).__init__(dims, num_actions, mlp)
@@ -44,10 +43,9 @@ class SimpleModelIQN(SimpleModelQ):
         super(SimpleModelIQN, self).__init__(dims, num_actions, mlp)
         self.K = K
         self.inner_size = inner_size
-        self.pi_base = torch.tensor([math.pi * i for i in xrange(n)]).view(1, -1)
-        self.phi_mlp = nn.Sequential(
-            nn.Linear(n, self.inner_size),
-            nn.ReLU())
+        self.pi_base = torch.tensor([math.pi * i for i in xrange(n)]).view(1,
+                                                                           -1)
+        self.phi_mlp = nn.Sequential(nn.Linear(n, self.inner_size), nn.ReLU())
         self.f = nn.Linear(self.inner_size, num_actions)
 
     def get_phi(self, batch_size, N):
@@ -70,4 +68,5 @@ class SimpleModelIQN(SimpleModelQ):
         q_quantiles = q_quantiles.view(-1, N, self.num_actions)
         q_quantiles = q_quantiles.transpose(1, 2)
         q_values = q_quantiles.mean(-1)
-        return dict(q_value=q_values, q_value_list=q_quantiles, tau=tau), states
+        return dict(
+            q_value=q_values, q_value_list=q_quantiles, tau=tau), states

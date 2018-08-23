@@ -38,7 +38,7 @@ class DistributionalAlgorithm(SimpleQ):
 
         with torch.no_grad():
             next_values, next_states_update = self.get_next_value(next_inputs,
-                                                                   next_states)
+                                                                  next_states)
             next_q_lists = self.check_alive(next_values, next_alive)
             next_expected_q_values = next_values["q_value"]
             _, next_action = next_expected_q_values.max(-1)
@@ -95,8 +95,7 @@ class C51(DistributionalAlgorithm):
                                    self.discount_factor, next_q_list)
         ## Cross-entropy loss
         cost = -torch.matmul(
-            critic_value.unsqueeze(1),
-            q_list.log().unsqueeze(-1)).view(-1, 1)
+            critic_value.unsqueeze(1), q_list.log().unsqueeze(-1)).view(-1, 1)
         return cost
 
     def backup(self, z, vmax, vmin, delta_z, reward, discount,
@@ -141,15 +140,14 @@ class QuantileAlgorithm(DistributionalAlgorithm):
                  exploration_end_steps=0,
                  exploration_end_rate=0.1,
                  update_ref_interval=100):
-        super(QuantileAlgorithm, self).__init__(model, gpu_id, discount_factor,
-                                  exploration_end_steps, exploration_end_rate,
-                                  update_ref_interval)
+        super(QuantileAlgorithm, self).__init__(
+            model, gpu_id, discount_factor, exploration_end_steps,
+            exploration_end_rate, update_ref_interval)
         self.loss = torch.nn.SmoothL1Loss(reduce=False)
 
     def check_alive(self, next_values, next_alive):
         next_q_distributions = next_values["q_value_list"] * torch.abs(
-            next_alive[
-                "alive"].view(-1, 1, 1))
+            next_alive["alive"].view(-1, 1, 1))
         return next_q_distributions
 
     def get_quantile_huber_loss(self, critic_value, q_distribution, tau):
@@ -179,10 +177,11 @@ class QRDQN(QuantileAlgorithm):
                  exploration_end_rate=0.1,
                  update_ref_interval=100):
         super(QRDQN, self).__init__(model, gpu_id, discount_factor,
-                                  exploration_end_steps, exploration_end_rate,
-                                  update_ref_interval)
+                                    exploration_end_steps,
+                                    exploration_end_rate, update_ref_interval)
         N = self.model.N
-        self.tau_hat = torch.tensor([(2 * i + 1.) / (2 * N) for i in xrange(N)]).view(1, -1)
+        self.tau_hat = torch.tensor(
+            [(2 * i + 1.) / (2 * N) for i in xrange(N)]).view(1, -1)
 
     def get_cost(self, q_list, next_q_list, reward, values, next_values):
         critic_value = reward + self.discount_factor * next_q_list
@@ -219,8 +218,10 @@ class IQN(QuantileAlgorithm):
         tau = values["tau"].unsqueeze(1)
 
         batch_size = q_list.size()[0]
-        q_distribution = q_list.unsqueeze(1).expand(batch_size, self.next_N, self.N)
-        critic_value = critic_value.unsqueeze(-1).expand(batch_size, self.next_N, self.N)
+        q_distribution = q_list.unsqueeze(1).expand(batch_size, self.next_N,
+                                                    self.N)
+        critic_value = critic_value.unsqueeze(-1).expand(batch_size,
+                                                         self.next_N, self.N)
 
         cost = self.get_quantile_huber_loss(critic_value, q_distribution, tau)
         cost = cost.squeeze(1).sum(-1, keepdim=True)
