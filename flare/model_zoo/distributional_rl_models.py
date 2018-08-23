@@ -33,10 +33,10 @@ class SimpleModelQRDQN(SimpleModelQ):
         self.N = N
 
     def value(self, inputs, states):
-        q_distributions = self.mlp(inputs.values()[0])
-        q_distributions = q_distributions.view(-1, self.num_actions, self.N)
-        q_values = q_distributions.mean(-1)
-        return dict(q_value=q_values, q_value_list=q_distributions), states
+        q_quantiles = self.mlp(inputs.values()[0])
+        q_quantiles = q_quantiles.view(-1, self.num_actions, self.N)
+        q_values = q_quantiles.mean(-1)
+        return dict(q_value=q_values, q_value_list=q_quantiles), states
 
 
 class SimpleModelIQN(SimpleModelQ):
@@ -66,8 +66,8 @@ class SimpleModelIQN(SimpleModelQ):
         phi, tau = self.get_phi(psi.size()[0], N)
         Z = psi * phi
         Z = Z.view(-1, self.inner_size)
-        q_distributions = self.f(Z)
-        q_distributions = q_distributions.view(-1, N, self.num_actions)
-        q_distributions = q_distributions.transpose(1, 2)
-        q_values = q_distributions.mean(-1)
-        return dict(q_value=q_values, q_value_list=q_distributions, tau=tau), states
+        q_quantiles = self.f(Z)
+        q_quantiles = q_quantiles.view(-1, N, self.num_actions)
+        q_quantiles = q_quantiles.transpose(1, 2)
+        q_values = q_quantiles.mean(-1)
+        return dict(q_value=q_values, q_value_list=q_quantiles, tau=tau), states

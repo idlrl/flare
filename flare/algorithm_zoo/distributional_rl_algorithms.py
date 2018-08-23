@@ -34,23 +34,22 @@ class DistributionalAlgorithm(SimpleQ):
         reward = rewards["reward"]
 
         values, states_update = self.get_current_value(inputs, states)
-        q_distributions = values["q_value_list"]
+        q_lists = values["q_value_list"]
 
         with torch.no_grad():
             next_values, next_states_update = self.get_next_value(next_inputs,
                                                                    next_states)
-            next_q_distributions = self.check_alive(next_values, next_alive)
+            next_q_lists = self.check_alive(next_values, next_alive)
             next_expected_q_values = next_values["q_value"]
             _, next_action = next_expected_q_values.max(-1)
             next_action = next_action.unsqueeze(-1)
 
-        assert q_distributions.size()[:2] == next_q_distributions.size()[:2]
+        assert q_lists.size()[:2] == next_q_lists.size()[:2]
 
-        q_distribution = self.select_q_distribution(q_distributions, action)
-        next_q_distribution = self.select_q_distribution(next_q_distributions,
-                                                         next_action)
+        q_list = self.select_q_distribution(q_lists, action)
+        next_q_list = self.select_q_distribution(next_q_lists, next_action)
 
-        cost = self.get_cost(q_distribution, next_q_distribution, reward, values, next_values)
+        cost = self.get_cost(q_list, next_q_list, reward, values, next_values)
         return dict(cost=cost), states_update, next_states_update
 
     def get_current_value(self, inputs, states):
@@ -59,10 +58,10 @@ class DistributionalAlgorithm(SimpleQ):
     def get_next_value(self, next_inputs, next_states):
         return self.ref_model.value(next_inputs, next_states)
 
-    def check_alive(self, next_q_value_list, next_alize):
+    def check_alive(self, next_values, next_alive):
         pass
 
-    def get_cost(self, q_distribution, next_q_distribution, reward, values, next_values):
+    def get_cost(self, q_list, next_q_list, reward, values, next_values):
         pass
 
 
@@ -90,14 +89,14 @@ class C51(DistributionalAlgorithm):
                                self.dead_dist * (1 - alpha)
         return next_q_distributions
 
-    def get_cost(self, q_distribution, next_q_distribution, reward, values, next_values):
+    def get_cost(self, q_list, next_q_list, reward, values, next_values):
         critic_value = self.backup(self.model.atoms, self.float_vmax,
                                    self.float_vmin, self.model.delta_z, reward,
-                                   self.discount_factor, next_q_distribution)
+                                   self.discount_factor, next_q_list)
         ## Cross-entropy loss
         cost = -torch.matmul(
             critic_value.unsqueeze(1),
-            q_distribution.log().unsqueeze(-1)).view(-1, 1)
+            q_list.log().unsqueeze(-1)).view(-1, 1)
         return cost
 
     def backup(self, z, vmax, vmin, delta_z, reward, discount,
@@ -185,9 +184,9 @@ class QRDQN(QuantileAlgorithm):
         N = self.model.N
         self.tau_hat = torch.tensor([(2 * i + 1.) / (2 * N) for i in xrange(N)]).view(1, -1)
 
-    def get_cost(self, q_distribution, next_q_distribution, reward, values, next_values):
-        critic_value = reward + self.discount_factor * next_q_distribution
-        cost = self.get_quantile_huber_loss(critic_value, q_distribution, self.tau_hat)
+    def get_cost(self, q_list, next_q_list, reward, values, next_values):
+        critic_value = reward + self.discount_factor * next_q_list
+        cost = self.get_quantile_huber_loss(critic_value, q_list, self.tau_hat)
         return cost
 
 
@@ -215,12 +214,12 @@ class IQN(QuantileAlgorithm):
         self.N = N
         self.next_N = N_prime
 
-    def get_cost(self, q_distribution, next_q_distribution, reward, values, next_values):
-        critic_value = reward + self.discount_factor * next_q_distribution
+    def get_cost(self, q_list, next_q_list, reward, values, next_values):
+        critic_value = reward + self.discount_factor * next_q_list
         tau = values["tau"].unsqueeze(1)
 
-        batch_size = q_distribution.size()[0]
-        q_distribution = q_distribution.unsqueeze(1).expand(batch_size, self.next_N, self.N)
+        batch_size = q_list.size()[0]
+        q_distribution = q_list.unsqueeze(1).expand(batch_size, self.next_N, self.N)
         critic_value = critic_value.unsqueeze(-1).expand(batch_size, self.next_N, self.N)
 
         cost = self.get_quantile_huber_loss(critic_value, q_distribution, tau)
