@@ -1,5 +1,5 @@
-from flare.algorithm_zoo.simple_algorithms import C51
-from flare.model_zoo.simple_models import SimpleModelC51
+from flare.algorithm_zoo.distributional_rl_algorithms import C51
+from flare.model_zoo.distributional_rl_models import SimpleModelC51
 import numpy as np
 import math
 import torch

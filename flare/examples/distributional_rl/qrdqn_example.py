@@ -1,14 +1,14 @@
 import torch.nn as nn
-from flare.algorithm_zoo.simple_algorithms import IQN
+from flare.algorithm_zoo.distributional_rl_algorithms import QRDQN
 from flare.framework.manager import Manager
-from flare.model_zoo.simple_models import SimpleModelIQN
+from flare.model_zoo.distributional_rl_models import SimpleModelQRDQN
 from flare.framework.agent import ExpReplayHelper
 from flare.framework.env import GymEnv
 from flare.agent_zoo.simple_rl_agents import SimpleRLAgent
 
 if __name__ == '__main__':
     """
-    A demo of how to run a IQN experiment
+    A demo of how to run a QR-DQN experiment
     """
     game = "MountainCar-v0"
 
@@ -33,15 +33,13 @@ if __name__ == '__main__':
         nn.Linear(inner_size, inner_size),
         nn.ReLU(), nn.Linear(inner_size, inner_size), nn.ReLU())
 
-    alg = IQN(model=SimpleModelIQN(
+    alg = QRDQN(model=SimpleModelQRDQN(
         dims=state_shape,
         num_actions=num_actions,
-        mlp=mlp,
-        inner_size=inner_size),
+        mlp=nn.Sequential(mlp, nn.Linear(inner_size, num_actions * bins)),
+        N=bins),
               exploration_end_steps=500000 / num_agents,
-              update_ref_interval=100,
-              N=8,
-              N_prime=8)
+              update_ref_interval=100)
 
     # 3. Specify the settings for learning: the algorithm to use (SimpleAC
     # in this case), data sampling strategy (OnPolicyHelper here) and other

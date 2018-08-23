@@ -1,4 +1,4 @@
-from flare.model_zoo.simple_models import SimpleModelIQN
+from flare.model_zoo.distributional_rl_models import SimpleModelIQN
 import torch
 import torch.nn as nn
 import unittest
