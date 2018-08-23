@@ -4,7 +4,7 @@ from flare.algorithm_zoo.simple_algorithms import SimpleAC
 from flare.framework.manager import Manager
 from flare.model_zoo.simple_models import SimpleRNNModelAC
 from flare.agent_zoo.simple_rl_agents import SimpleRNNRLAgent
-from flare.framework.agent import OnPolicyHelper
+from flare.framework.agent import OnlineHelper
 from flare.framework.env import GymEnv
 
 if __name__ == '__main__':
@@ -33,14 +33,14 @@ if __name__ == '__main__':
         dims=state_shape, num_actions=num_actions, perception_net=mlp))
 
     # 3. Specify the settings for learning: the algorithm to use (SimpleAC
-    # in this case), data sampling strategy (OnPolicyHelper here) and other
+    # in this case), data sampling strategy (OnlineHelper here) and other
     # settings used by ComputationTask.
     ct_settings = {
         "RL": dict(
             algorithm=alg,
             hyperparas=dict(lr=1e-4),
             # sampling
-            agent_helper=OnPolicyHelper,
+            agent_helper=OnlineHelper,
             sample_interval=8,
             num_agents=num_agents)
     }

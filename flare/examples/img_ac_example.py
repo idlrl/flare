@@ -4,7 +4,7 @@ from flare.algorithm_zoo.simple_algorithms import SimpleAC
 from flare.model_zoo.simple_models import SimpleModelAC
 from flare.framework.manager import Manager
 from flare.agent_zoo.simple_rl_agents import SimpleRLAgent
-from flare.framework.agent import OnPolicyHelper
+from flare.framework.agent import OnlineHelper
 from flare.framework.env import GymEnvImage
 from flare.framework.common_functions import Flatten
 
@@ -12,7 +12,7 @@ if __name__ == '__main__':
     """
     A demo of how to train from image inputs
     """
-    game = "Breakout-v0"
+    game = "Assault-v0"
 
     num_agents = 16
     num_games = 8000
@@ -50,7 +50,7 @@ if __name__ == '__main__':
         gpu_id=1)
 
     # 3. Specify the settings for learning: data sampling strategy
-    # (OnPolicyHelper here) and other settings used by
+    # (OnlineHelper here) and other settings used by
     # ComputationTask.
     ct_settings = {
         "RL": dict(
@@ -58,7 +58,7 @@ if __name__ == '__main__':
             hyperparas=dict(
                 lr=1e-4, grad_clip=5.0),
             # sampling
-            agent_helper=OnPolicyHelper,
+            agent_helper=OnlineHelper,
             # each agent will call `learn()` every `sample_interval` steps
             sample_interval=5,
             num_agents=num_agents)
