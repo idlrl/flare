@@ -83,38 +83,30 @@ class SimpleModelC51(SimpleModelQ):
         atoms = [vmin + i * self.delta_z for i in xrange(self.bins)]
         self.atoms = torch.tensor(atoms)
 
-    def policy(self, inputs, states):
-        values, states = self.value(inputs, states)
-        expected_q_values = self.get_expected_q_values(values["q_value"])
-        return dict(action=comf.q_categorical(expected_q_values)), states
-
     def value(self, inputs, states):
         q_distributions = self.mlp(inputs.values()[0])
         q_distributions = q_distributions.view(-1, self.num_actions, self.bins)
         q_distributions = F.softmax(q_distributions, 2)
-        return dict(q_value=q_distributions), states
-
-    def get_expected_q_values(self, q_distribution):
-        return torch.matmul(q_distribution, self.atoms)
+        q_values = torch.matmul(q_distributions, self.atoms)
+        return dict(q_value=q_values, q_value_list=q_distributions), states
 
 
-class SimpleModelQRDQN(SimpleModelC51):
+
+class SimpleModelQRDQN(SimpleModelQ):
     def __init__(self, dims, num_actions, mlp, N):
-        super(SimpleModelQRDQN, self).__init__(dims, num_actions, mlp, 10, -10, N)
+        super(SimpleModelQRDQN, self).__init__(dims, num_actions, mlp)
         self.N = N
 
     def value(self, inputs, states):
         q_distributions = self.mlp(inputs.values()[0])
-        q_distributions = q_distributions.view(-1, self.num_actions, self.bins)
-        return dict(q_value=q_distributions), states
-
-    def get_expected_q_values(self, q_distribution):
-        return q_distribution.mean(-1)
+        q_distributions = q_distributions.view(-1, self.num_actions, self.N)
+        q_values = q_distributions.mean(-1)
+        return dict(q_value=q_values, q_value_list=q_distributions), states
 
 
-class SimpleModelIQN(SimpleModelQRDQN):
+class SimpleModelIQN(SimpleModelQ):
     def __init__(self, dims, num_actions, mlp, inner_size, K=32, n=64):
-        super(SimpleModelIQN, self).__init__(dims, num_actions, mlp, K)
+        super(SimpleModelIQN, self).__init__(dims, num_actions, mlp)
         self.K = K
         self.inner_size = inner_size
         self.pi_base = torch.tensor([math.pi * i for i in xrange(n)]).view(1, -1)
@@ -139,10 +131,11 @@ class SimpleModelIQN(SimpleModelQRDQN):
         phi, tau = self.get_phi(psi.size()[0], N)
         Z = psi * phi
         Z = Z.view(-1, self.inner_size)
-        q_values = self.f(Z)
-        q_values = q_values.view(-1, N, self.num_actions)
-        q_values = q_values.transpose(1, 2)
-        return dict(q_value=q_values, tau=tau), states
+        q_distributions = self.f(Z)
+        q_distributions = q_distributions.view(-1, N, self.num_actions)
+        q_distributions = q_distributions.transpose(1, 2)
+        q_values = q_distributions.mean(-1)
+        return dict(q_value=q_values, q_value_list=q_distributions, tau=tau), states
 
 
 class SimpleRNNModelAC(Model):

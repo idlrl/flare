@@ -53,7 +53,7 @@ class TestSimpleModelIQN(unittest.TestCase):
             K=K)
         value, a_state = model.value(dm, state, N)
         self.assertEqual(state, a_state)
-        self.assertEqual((batch_size, num_actions, N), value["q_value"].size())
+        self.assertEqual((batch_size, num_actions, N), value["q_value_list"].size())
 
 
 if __name__ == "__main__":
