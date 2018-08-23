@@ -132,13 +132,13 @@ class TestAlgorithm(Algorithm):
 ```
 
 ## Computation Task <a name="ct"/>
-`ComputationTask` (CT) is designed to be a relatively independent task an agent performs. A CT will contain an `Algorithm` object which in turns contain a `Model` object. A CT has the following steps in its `predict()` or `learn()`:
+`ComputationTask` (CT) is designed to be a relatively independent task an agent performs. A CT will contain an `Algorithm` object which in turn contains a `Model` object. A CT has the following steps in its `predict()` or `learn()`:
 
-1. Convert input Numpy arrays into PyTorch tensors. During conversion, it obtains input/output specs information from the model of the algorithm.
-2. Call the algorithm's `predict()` or `learn()`.
+1. Convert input Numpy arrays into PyTorch tensors. During conversion, it obtains input/output specs information from the model of the algorithm;
+2. Call the algorithm's `predict()` or `learn()`;
 3. Detach and convert the PyTorch tensors output by the algorithm back to Numpy arrays.
 
-The agent might have multiple CTs at the same time. It is assumed that there is no gradient flowing between two different CTs. However, different CTs may share common model parameters if their algorithms contain a (partially) common `Model`. It should be noted that each CT has its own training data buffer and/or data sampling schedule. For example, one CT might be a standard RL task that maximizes the episodic reward, while a second CT might be an auxiliary task that tries to predict immediate rewards only when the reward is non-trivial (i.e., balanced data for supervised learning). Another scenario that needs multiple CTs is hierarchical RL where a CT outputs a goal at a higher level and another CT generates actions given the goal for a certain amount of time steps.
+The agent might have multiple CTs at the same time. It is assumed that there is no gradient flowing between two different CTs. However, different CTs may share common model parameters if their algorithms contain a (partially) common `Model`. It should be noted that each CT has its own training data buffer and/or data sampling schedule. For example, one CT might be a standard RL task that maximizes the episodic reward, while a second CT might be an auxiliary task that tries to predict immediate rewards only when the reward is non-trivial (i.e., balanced data for supervised learning). Another scenario that needs multiple CTs is hierarchical RL where a CT outputs a goal at a higher level and another CT generates actions given the goal for a certain number of time steps.
 
 If there are multiple CTs, the agent is responsible for implementing the calling order of them in its function `_cts_predict()`. The agent is also responsible for implementing when and what to store for each CT in `_cts_store_data`. See more details in the section [Agent](#agent).
 
