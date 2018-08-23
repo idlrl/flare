@@ -3,7 +3,6 @@ from flare.framework.distributions import Deterministic
 from flare.framework import common_functions as comf
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.distributions import Categorical, MultivariateNormal
 
 
@@ -67,34 +66,6 @@ class SimpleModelQ(Model):
 
     def value(self, inputs, states):
         return dict(q_value=self.mlp(inputs.values()[0])), states
-
-
-class SimpleModelC51(SimpleModelQ):
-    def __init__(self, dims, num_actions, mlp, vmax, vmin, bins):
-        super(SimpleModelC51, self).__init__(dims, num_actions, mlp)
-        assert bins > 1
-        assert vmax > vmin
-        self.vmax = vmax
-        self.vmin = vmin
-        self.bins = bins
-
-        self.delta_z = float(self.vmax - self.vmin) / (self.bins - 1)
-        atoms = [vmin + i * self.delta_z for i in xrange(self.bins)]
-        self.atoms = torch.tensor(atoms)
-
-    def policy(self, inputs, states):
-        values, states = self.value(inputs, states)
-        expected_q_values = self.get_expected_q_values(values["q_value"])
-        return dict(action=comf.q_categorical(expected_q_values)), states
-
-    def value(self, inputs, states):
-        q_distributions = self.mlp(inputs.values()[0])
-        q_distributions = q_distributions.view(-1, self.num_actions, self.bins)
-        q_distributions = F.softmax(q_distributions, 2)
-        return dict(q_value=q_distributions), states
-
-    def get_expected_q_values(self, q_distribution):
-        return torch.matmul(q_distribution, self.atoms)
 
 
 class SimpleRNNModelAC(Model):
