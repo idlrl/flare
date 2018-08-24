@@ -2,6 +2,8 @@ from flare.algorithm_zoo.distributional_rl_algorithms import C51
 from flare.model_zoo.distributional_rl_models import SimpleModelC51
 from flare.algorithm_zoo.distributional_rl_algorithms import QRDQN
 from flare.model_zoo.distributional_rl_models import SimpleModelQRDQN
+from flare.algorithm_zoo.distributional_rl_algorithms import IQN
+from flare.model_zoo.distributional_rl_models import SimpleModelIQN
 import numpy as np
 import math
 import torch
@@ -10,20 +12,25 @@ import unittest
 
 
 class TestC51(unittest.TestCase):
-    def test_select_q_distribution(self):
+    def initialize(self, bins=2):
         inner_size = 256
         num_actions = 3
         state_shape = [1]
         mlp = nn.Sequential(nn.Linear(inner_size, inner_size), nn.ReLU())
-        alg = C51(model=SimpleModelC51(
+        model = SimpleModelC51(
             dims=state_shape,
             num_actions=num_actions,
             perception_net=mlp,
             vmax=10,
             vmin=-10,
-            bins=2),
+            bins=bins)
+        alg = C51(model=model,
                   exploration_end_steps=500000,
                   update_ref_interval=100)
+        return model, alg
+
+    def test_select_q_distribution(self):
+        model, alg = self.initialize()
 
         distribution = [[[0.1, 0.9], [0.2, 0.8], [0.3, 0.7]],
                         [[0.4, 0.6], [0.5, 0.5], [0.6, 0.4]]]
@@ -39,24 +46,12 @@ class TestC51(unittest.TestCase):
             self.assertAlmostEqual(x, y)
 
     def test_check_alive(self):
-        inner_size = 256
-        num_actions = 3
-        state_shape = [1]
-        mlp = nn.Sequential(nn.Linear(inner_size, inner_size), nn.ReLU())
-        alg = C51(model=SimpleModelC51(
-            dims=state_shape,
-            num_actions=num_actions,
-            perception_net=mlp,
-            vmax=10,
-            vmin=-10,
-            bins=3),
-                  exploration_end_steps=500000,
-                  update_ref_interval=100)
+        model, alg = self.initialize(3)
 
         values = [[[1, 2, 3]] * 2, [[3, 4, 5]] * 2, [[5, 6, 7]] * 2]
         alive = [1, 0, 1]
-        next_values = {"q_value_distribution": torch.tensor(values).float()}
-        next_alive = {"alive": torch.tensor(alive).float().view(-1, 1)}
+        next_values = torch.tensor(values).float()
+        next_alive = torch.tensor(alive).float().view(-1, 1)
 
         expected = [
             a if b == 1 else [[0, 1, 0]] * 2 for a, b in zip(values, alive)
@@ -82,20 +77,7 @@ class TestC51(unittest.TestCase):
         return m
 
     def test_backup(self):
-        inner_size = 256
-        num_actions = 3
-        state_shape = [1]
-        mlp = nn.Sequential(nn.Linear(inner_size, inner_size), nn.ReLU())
-        model = SimpleModelC51(
-            dims=state_shape,
-            num_actions=num_actions,
-            perception_net=mlp,
-            vmax=10,
-            vmin=-10,
-            bins=2)
-        alg = C51(model=model,
-                  exploration_end_steps=500000,
-                  update_ref_interval=100)
+        model, alg = self.initialize()
 
         discount = 0.9
         reward = [[1.5], [-0.2], [0.]]
@@ -117,9 +99,31 @@ class TestC51(unittest.TestCase):
         for x, y in zip(expected, actual):
             self.assertAlmostEqual(x, y)
 
+    def test_get_current_values(self):
+        model, alg = self.initialize()
+
+        A = "A"
+        B = "B"
+        alg.model.value = lambda x, y: (x, y)
+        A_hat, B_hat = alg.get_current_values(A, B)
+        self.assertEqual(A, A_hat)
+        self.assertEqual(B, B_hat)
+
+    def test_get_next_values(self):
+        model, alg = self.initialize()
+
+        A = "A"
+        B = "B"
+        C = {"q_value": A}
+        alg.ref_model.value = lambda x, y: (x, y)
+        C_hat, B_hat, A_hat = alg.get_next_values(C, B)
+        self.assertEqual(A, A_hat)
+        self.assertEqual(B, B_hat)
+        self.assertEqual(C, C_hat)
+
 
 class TestQRDQN(unittest.TestCase):
-    def test_check_alive(self):
+    def initialize(self, bins=2):
         inner_size = 256
         num_actions = 3
         state_shape = [1]
@@ -133,11 +137,15 @@ class TestQRDQN(unittest.TestCase):
                 N=N),
             exploration_end_steps=500000,
             update_ref_interval=100)
+        return alg
+
+    def test_check_alive(self):
+        alg = self.initialize()
 
         values = [[[1], [2], [3]], [[3], [4], [5]], [[5], [6], [7]]]
         alive = [1, 0, 1]
-        next_values = {"q_value_distribution": torch.tensor(values).float()}
-        next_alive = {"alive": torch.tensor(alive).float().view(-1, 1)}
+        next_values = torch.tensor(values).float()
+        next_alive = torch.tensor(alive).float().view(-1, 1)
 
         expected = [
             a if b == 1 else [[0], [0], [0]] for a, b in zip(values, alive)
@@ -148,40 +156,102 @@ class TestQRDQN(unittest.TestCase):
         for x, y in zip(expected.flatten(), actual.flatten()):
             self.assertAlmostEqual(x, y)
 
+    def huber_loss(self, u, k=1):
+        if abs(u) <= k:
+            return 0.5 * u * u
+        else:
+            return k * (abs(u) - 0.5 * k)
+
+    def quantile_huber_loss(self, u, tau, k=1):
+        if u < 0:
+            delta = 1
+        else:
+            delta = 1
+        return abs(tau - delta) * self.huber_loss(u, k)
+
+    def expection_quantile_huber_loss(self, theta, Ttheta, tau, k=1):
+        r1 = 0
+        for theta_i, tau_i in zip(theta, tau):
+            r2 = 0
+            for Ttheta_j in Ttheta:
+                r2 += self.quantile_huber_loss(Ttheta_j - theta_i, tau_i, k)
+            r1 += r2 / len(Ttheta)
+        return r1
+
+    def batch_expection_quantile_huber_loss(self,
+                                            q_distribution,
+                                            critic_value,
+                                            tau,
+                                            k=1):
+        expected = []
+        for theta, Ttheta, t in zip(q_distribution, critic_value, tau):
+            expected.append(
+                self.expection_quantile_huber_loss(theta, Ttheta, t, k))
+        return expected
+
     def test_get_quantile_huber_loss(self):
-        inner_size = 256
-        num_actions = 3
-        state_shape = [1]
-        N = 51
-        mlp = nn.Sequential(nn.Linear(inner_size, inner_size), nn.ReLU())
-        alg = QRDQN(
-            model=SimpleModelQRDQN(
-                dims=state_shape,
-                num_actions=num_actions,
-                perception_net=mlp,
-                N=N),
-            exploration_end_steps=500000,
-            update_ref_interval=100)
+        alg = self.initialize()
 
-        critic_value = torch.tensor([[-1, 2], [3, 4], [-5, 6]]).float()
-        q_distribution = torch.tensor([[9, 8.5], [7, 6], [-5, 6]]).float()
-        tau = torch.tensor([[0.3, 0.6]]).float()
+        critic_value = [[-1., 2.], [3., 4.], [-5., -5.]]
+        q_distribution = [[9., 8.5], [7., 6.], [-5., -5.]]
+        tau = [[0.3, 0.6], [0.4, 0.8], [0.6, 0.1]]
+        expected = self.batch_expection_quantile_huber_loss(
+            q_distribution, critic_value, tau, k=1)
+        expected = np.array(expected)
 
-        expected = np.array([[4.525], [1.525], [0.0]])
+        critic_value = torch.tensor(critic_value)
+        q_distribution = torch.tensor(q_distribution)
+        tau = torch.tensor(tau)
         actual = alg.get_quantile_huber_loss(critic_value, q_distribution,
-                                             tau).numpy()
+                                             tau).view(-1).numpy()
+
         self.assertEqual(expected.shape, actual.shape)
         for x, y in zip(expected.flatten(), actual.flatten()):
             self.assertAlmostEqual(x, y, places=6)
 
-    def get_quantile_huber_loss(self, critic_value, q_distribution, tau):
-        huber_loss = self.loss(q_distribution, critic_value)
-        u = critic_value - q_distribution
-        delta = (u < 0).float()
-        asymmetric = torch.abs(tau - delta)
-        quantile_huber_loss = asymmetric * huber_loss
-        cost = quantile_huber_loss.mean(1, keepdim=True)
-        return cost
+
+class TestIQN(unittest.TestCase):
+    def initialize(self):
+        inner_size = 256
+        num_actions = 3
+        state_shape = [1]
+        mlp = nn.Sequential(nn.Linear(inner_size, inner_size), nn.ReLU())
+        model = SimpleModelIQN(
+            dims=state_shape,
+            num_actions=num_actions,
+            perception_net=mlp,
+            inner_size=inner_size)
+        alg = IQN(model=model,
+                  exploration_end_steps=500000,
+                  update_ref_interval=100)
+        return alg
+
+    def test_get_current_values(self):
+        alg = self.initialize()
+
+        A = "A"
+        B = "B"
+        N = 10
+        alg.model.value = lambda x, y, z: (x, y, z)
+        alg.N = N
+        A_hat, B_hat, N_hat = alg.get_current_values(A, B)
+        self.assertEqual(A, A_hat)
+        self.assertEqual(B, B_hat)
+        self.assertEqual(N, N_hat)
+
+    def tdest_get_next_values(self):
+        alg = self.initialize()
+
+        next_values = "A"
+        next_value = "B"
+        next_states_update = "C"
+        a_list = [next_values, {"q_value": next_value}]
+        alg.ref_model.value = lambda x, y, z: (x, y, z)
+
+        A_hat, B_hat, C_hat = alg.get_next_values(a_list, next_states_update)
+        self.assertEqual(next_values, A_hat)
+        self.assertEqual(next_states_update, B_hat)
+        self.assertEqual(next_value, C_hat)
 
 
 if __name__ == "__main__":

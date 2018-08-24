@@ -1,4 +1,3 @@
-from flare.framework import common_functions as comf
 from simple_models import SimpleModelQ
 import torch
 import torch.nn as nn
@@ -19,7 +18,9 @@ class SimpleModelC51(SimpleModelQ):
 
         self.delta_z = float(self.vmax - self.vmin) / (self.bins - 1)
         atoms = [vmin + i * self.delta_z for i in xrange(self.bins)]
-        self.atoms = torch.tensor(atoms)
+        atoms = torch.tensor(atoms, requires_grad=False)
+        ## atoms are constent, so register as buffer.
+        self.register_buffer("atoms", atoms)
 
     def value(self, inputs, states):
         q_distributions = self.value_net(inputs.values()[0])
@@ -35,13 +36,20 @@ class SimpleModelQRDQN(SimpleModelQ):
         super(SimpleModelQRDQN, self).__init__(dims, num_actions * N,
                                                perception_net)
         self.num_actions = num_actions
+        tau_hat = torch.tensor(
+            [(2 * i + 1.) / (2 * N) for i in xrange(N)],
+            requires_grad=False).view(1, -1)
+        self.register_buffer("tau_hat", tau_hat)
         self.N = N
 
     def value(self, inputs, states):
         q_quantiles = self.value_net(inputs.values()[0])
         q_quantiles = q_quantiles.view(-1, self.num_actions, self.N)
         q_values = q_quantiles.mean(-1)
-        return dict(q_value=q_values, q_value_distribution=q_quantiles), states
+        return dict(
+            q_value=q_values,
+            q_value_distribution=q_quantiles,
+            tau=self.tau_hat), states
 
 
 class SimpleModelIQN(SimpleModelQ):
@@ -50,41 +58,51 @@ class SimpleModelIQN(SimpleModelQ):
                  num_actions,
                  perception_net,
                  inner_size,
-                 K=32,
-                 n=64):
+                 n=64,
+                 default_samples=32):
         super(SimpleModelIQN, self).__init__(dims, inner_size, perception_net)
         self.num_actions = num_actions
-        self.K = K
         self.inner_size = inner_size
-        self.pi_base = torch.tensor([math.pi * i for i in xrange(n)]).view(1,
-                                                                           -1)
-        self.phi_mlp = nn.Sequential(nn.Linear(n, self.inner_size), nn.ReLU())
-        self.f = nn.Linear(self.inner_size, num_actions)
+        pi_base = torch.tensor(
+            [math.pi * i for i in xrange(n)], requires_grad=False).view(1, -1)
+        self.register_buffer("pi_base", pi_base)
+        phi_mlp = nn.Sequential(nn.Linear(n, self.inner_size), nn.ReLU())
+        self.add_module("phi_mlp", phi_mlp)
+        self.add_module("f", nn.Linear(self.inner_size, num_actions))
+        self.default_samples = default_samples
+
+    def value(self, inputs, states, N=None):
+        if N is None: N = self.default_samples
+        values, states = self.values(inputs, states, [N])
+        return values[0], states
+
+    def values(self, inputs, states, nums):
+        assert len(nums) > 0
+        psi = self.value_net(inputs.values()[0])
+        psi = psi.view(-1, 1, self.inner_size)
+        values = []
+        for N in nums:
+            phi, tau = self.get_phi(psi.size()[0], N)
+            Z = psi * phi
+            Z = Z.view(-1, self.inner_size)
+            q_quantiles = self.f(Z)
+            q_quantiles = q_quantiles.view(-1, N, self.num_actions)
+            q_quantiles = q_quantiles.transpose(1, 2)
+            q_values = q_quantiles.mean(-1)
+            values.append(
+                dict(
+                    q_value=q_values,
+                    q_value_distribution=q_quantiles,
+                    tau=tau))
+        return values, states
 
     def get_phi(self, batch_size, N):
-        tau = torch.rand(batch_size, N)
+        tau = torch.Tensor(batch_size, N)
+        if self.pi_base.is_cuda:
+            tau = tau.to(self.pi_base.get_device())
+        tau.normal_()
         x = tau.view(-1, 1) * self.pi_base
         x = x.cos()
         phi = self.phi_mlp(x)
         phi = phi.view(batch_size, N, -1)
         return phi, tau
-
-    def policy(self, inputs, states):
-        values, states = self.value(inputs, states, N=self.K)
-        q_value = values["q_value"]
-        return dict(action=comf.q_categorical(q_value)), states
-
-    def value(self, inputs, states, N=None):
-        if N is None: N = self.N
-        psi = self.value_net(inputs.values()[0])
-        psi = psi.view(-1, 1, self.inner_size)
-        phi, tau = self.get_phi(psi.size()[0], N)
-        Z = psi * phi
-        Z = Z.view(-1, self.inner_size)
-        q_quantiles = self.f(Z)
-        q_quantiles = q_quantiles.view(-1, N, self.num_actions)
-        q_quantiles = q_quantiles.transpose(1, 2)
-        q_values = q_quantiles.mean(-1)
-        return dict(
-            q_value=q_values, q_value_distribution=q_quantiles,
-            tau=tau), states

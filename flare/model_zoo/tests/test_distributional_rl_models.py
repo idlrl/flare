@@ -74,43 +74,6 @@ class TestSimpleSimpleModelQRDQN(unittest.TestCase):
 
 
 class TestSimpleModelIQN(unittest.TestCase):
-    def test_get_phi(self):
-        batch_size = 3
-        K = 32
-        N = 8
-        state_shape = [1]
-        inner_size = 256
-        mlp = nn.Sequential(nn.Linear(inner_size, inner_size), nn.ReLU())
-        model = SimpleModelIQN(
-            dims=state_shape,
-            num_actions=3,
-            perception_net=mlp,
-            inner_size=inner_size,
-            K=K)
-        phi, tau = model.get_phi(batch_size, N)
-        self.assertEqual((batch_size, N, inner_size), phi.size())
-        self.assertEqual((batch_size, N), tau.size())
-
-    def test_policy(self):
-        batch_size = 5
-        num_actions = 3
-        state_shape = [10]
-        inner_size = 256
-        K = 32
-        state = None
-        mlp = nn.Sequential(nn.Linear(state_shape[0], inner_size), nn.ReLU())
-        dm = DummyInput(batch_size, state_shape[0])
-
-        model = SimpleModelIQN(
-            dims=state_shape,
-            num_actions=num_actions,
-            perception_net=mlp,
-            inner_size=inner_size,
-            K=K)
-        value, states = model.policy(dm, state)
-        action = value["action"].probs
-        self.assertEqual((batch_size, num_actions), action.size())
-
     def test_value(self):
         batch_size = 5
         num_actions = 3
@@ -127,11 +90,53 @@ class TestSimpleModelIQN(unittest.TestCase):
             num_actions=num_actions,
             perception_net=mlp,
             inner_size=inner_size,
-            K=K)
+            default_samples=K)
         value, a_state = model.value(dm, state, N)
         self.assertEqual(state, a_state)
         self.assertEqual((batch_size, num_actions, N),
                          value["q_value_distribution"].size())
+
+    def test_values(self):
+        batch_size = 5
+        num_actions = 3
+        state_shape = [10]
+        inner_size = 256
+        K = 32
+        N1 = 8
+        N2 = 5
+        state = None
+        mlp = nn.Sequential(nn.Linear(state_shape[0], inner_size), nn.ReLU())
+        dm = DummyInput(batch_size, state_shape[0])
+
+        model = SimpleModelIQN(
+            dims=state_shape,
+            num_actions=num_actions,
+            perception_net=mlp,
+            inner_size=inner_size,
+            default_samples=K)
+        values, a_state = model.values(dm, state, [N1, N2])
+        self.assertEqual(state, a_state)
+        self.assertEqual((batch_size, num_actions, N1),
+                         values[0]["q_value_distribution"].size())
+        self.assertEqual((batch_size, num_actions, N2),
+                         values[1]["q_value_distribution"].size())
+
+    def test_get_phi(self):
+        batch_size = 3
+        K = 32
+        N = 8
+        state_shape = [1]
+        inner_size = 256
+        mlp = nn.Sequential(nn.Linear(inner_size, inner_size), nn.ReLU())
+        model = SimpleModelIQN(
+            dims=state_shape,
+            num_actions=3,
+            perception_net=mlp,
+            inner_size=inner_size,
+            default_samples=K)
+        phi, tau = model.get_phi(batch_size, N)
+        self.assertEqual((batch_size, N, inner_size), phi.size())
+        self.assertEqual((batch_size, N), tau.size())
 
 
 if __name__ == "__main__":
