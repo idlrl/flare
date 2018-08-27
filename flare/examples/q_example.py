@@ -38,7 +38,7 @@ if __name__ == '__main__':
         update_ref_interval=100)
 
     # 3. Specify the settings for learning: the algorithm to use (SimpleAC
-    # in this case), data sampling strategy (OnPolicyHelper here) and other
+    # in this case), data sampling strategy (ExpReplayHelper here) and other
     # settings used by ComputationTask.
     ct_settings = {
         "RL": dict(

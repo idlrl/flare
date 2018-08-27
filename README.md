@@ -48,7 +48,7 @@ from flare.model_zoo.simple_models import SimpleModelAC
 ## RL agent with simple control logic
 from flare.agent_zoo.simple_rl_agents import SimpleRLAgent
 ## the agent collects data in an on-line manner without a replay buffer
-from flare.framework.agent import OnPolicyHelper
+from flare.framework.agent import OnlineHelper
 ## import a wrapped version of OpenAI Gym
 from flare.framework.env import GymEnv
 ```
@@ -97,7 +97,7 @@ ct_settings = {
         algorithm=alg,       ## pass in the algorithm object
         hyperparas=dict(lr=5e-5),   ## set the learning rate
         # sampling
-        agent_helper=OnPolicyHelper,   ## the training data collection is on-policy
+        agent_helper=OnlineHelper,   ## the training data collection is online
         # each agent will call `learn()` every `sample_interval` steps
         sample_interval=4,
         num_agents=num_agents)
@@ -162,9 +162,16 @@ Except for some hyperparameters (e.g., number of agents, learning rate, gradient
 ```bash
 cd <flare_root>; python flare/example/img_ac_example.py
 ```
-Without much hyperparameter tweaking, after a total number of 100k games, the game reward is expected to reach 250, trained with 16 agents with a rollout length of 5. The following is the training curve of *reward vs. number of games*.
+Without much hyperparameter tweaking, after a total number of 100k games, the game reward is expected to reach 250, trained with 16 agents with a rollout length of 5. The reward curve is shown below.
 
-![](tutorial/image/reward_curve.png)
+#### Assault-v0
+We can directly change the game from Breakout to [Assault](https://en.wikipedia.org/wiki/Assault_(1983_video_game)) in `img_ac_example.py` and train the agent again. The reward exceeds 1k after 100k games.
+
+
+| Breakout | Assault |
+|----|----|
+|![](tutorial/image/reward_curve_breakout.png)|![](tutorial/image/reward_curve_assault.png)|
+
 
 ## Advanced usage
 For advanced usage of FLARE, you might want to take a look at a more comprehensive [tutorial](tutorial/index.md).

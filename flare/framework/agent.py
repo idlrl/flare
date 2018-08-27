@@ -147,17 +147,16 @@ class AgentHelper(object):
         ret = self.comm.get_training_return()
 
 
-class OnPolicyHelper(AgentHelper):
+class OnlineHelper(AgentHelper):
     """
-    On-policy helper. It calls `learn()` every `sample_interval`
+    Online helper. It calls `learn()` every `sample_interval`
     steps.
 
     While waiting for learning return, the calling `Agent` is blocked.
     """
 
     def __init__(self, name, communicator, sample_interval=5):
-        super(OnPolicyHelper, self).__init__(name, communicator,
-                                             sample_interval)
+        super(OnlineHelper, self).__init__(name, communicator, sample_interval)
         # NoReplacementQueue used to store past experience.
         self.exp_queue = NoReplacementQueue()
 

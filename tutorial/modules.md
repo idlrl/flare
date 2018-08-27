@@ -13,12 +13,12 @@ There are seven important modules of FLARE in total. Their structural relationsh
 * [Manager](#manager)
 
 ## Model <a name="model"/>
-The `Model` class inherits `torch.nn.Module` and implements the network structure. It defines all the computations that the user wants the network to support. These computation functions will be called by an `Algorithm` object that owns the `Model` object. This class only defines a network but is not responsible for training its parameters.
+The `Model` class inherits from `torch.nn.Module` and implements the network structure. It defines all the computations that the user wants the network to support. These computation functions will be called by an `Algorithm` object that owns the `Model` object. This class only defines a network but is not responsible for training its parameters.
 
 Sometimes after a `Model` is implemented, it might be reused in different scenarios. For example, we have defined a CNN that accepts an image input and outputs several Q values for action control when playing Atari. This same model class can be used by both SARSA and Q-learning, regardless of the their different training objectives.
 
 #### Customization
-To customize a new `Model`, the user needs to inherit the base model defined in `<flare_root>/flare/framework/algorithm.py`. Each model has several specs functions to be defined, and each specs function specifies the formats of input/output data. There are currently four possible specs functions in total:
+To customize a new `Model`, the user needs to derive from the base model defined in `<flare_root>/flare/framework/algorithm.py`. Each model has several specs functions to be defined, and each specs function specifies the formats of input/output data. There are currently four possible specs functions in total:
 ```python
 @abstractmethod
 def get_input_specs(self):
@@ -79,7 +79,7 @@ The `Algorithm` class implements the prediction and training logic based on a `M
 An `Algorithm` might be reused in different scenarios. For example, given a fixed `SimpleQ` algorithm implementation, we can easily apply it to either an MLP model or a CNN model to account for different observation inputs, without changing the learning objective (both use Q-learning).
 
 #### Customization
-To customize a new `Algorithm`, the user needs to inherit the base algorithm defined in `<flare_root>/flare/framework/algorithm.py`. Two functions need to be overridden:
+To customize a new `Algorithm`, the user needs to derive from the base algorithm defined in `<flare_root>/flare/framework/algorithm.py`. Two functions need to be overridden:
 ```python
 def predict(self, inputs, states):
     """
@@ -195,7 +195,107 @@ For an agent, each CT is a neural blackbox. A CT receives numpy arrays and outpu
 ![](image/agent_cdp_ct.jpg)
 
 ## Agent <a name="agent"/>
+An `Agent` implements the high-level logic of how to interact with the environment and how to collect experiences for learning. It basically runs for a predefined number of game episodes, and for each episode executes the code in `_run_one_episode()`. Inside this function, it coordinates between CTs to generate response to the environment.
+
+We have already provided an implementation of `_run_one_episode()` in `<flare_root>/flare/framework/agent.py`.
+```python
+def _run_one_episode(self):
+    observations = self._reset_env()
+    states = self._get_init_states()  ## written by user
+
+    while self.alive and (not self._game_timeout()):
+        actions, next_states = self._cts_predict(
+            observations, states)  ## written by user
+        assert isinstance(actions, list)
+        assert isinstance(next_states, list)
+        next_observations, rewards, next_game_over = self._step_env(
+            actions)
+        self._cts_store_data(observations, actions, states,
+                             rewards)  ## written by user
+        observations = next_observations
+        states = next_states
+        self.alive = 1 - int(next_game_over)
+
+    actions, _ = self._cts_predict(observations, states)
+    if self._game_timeout():
+        self.alive = -1
+    self._cts_store_data(observations, actions, states, [0] * len(rewards))
+
+    return self._total_reward()
+```
+
+It is most likely that this function does not have to be overriden by the user because that its logic is very general. The logic is also quite critical: we suggest a user to have a deep understanding of the agent-environment interaction process before modifying `_run_one_episode()` for a specific purpose. Otherwise the training data might not be correctly collected (e.g., incorrect episode-end behavior for training).
+
+Within this block of code, the user usually has to implement three functions: `_get_init_states`, `_cts_predict` and `_cts_store_data`. The first function needed by memory-augmented agents is explained in details in [Short-term Temporal Memory](memory.md). The second function is called to predict actions given the current environment observations. If there are multiple CTs, the agent is responsible for specifying the calling order of them. The third function is called after the agent gets some feedback from the environment after taking actions (`_step_env`), and this feedback along with the current observations are stored in data buffers. If there are multiple CTs, each CT will have its own data buffer. Thus in `_cts_store_data`, the agent is responsible for implementing what data to store for each CT.
+
+The user can derive from the base `Agent` class to implement these three functions. For example, if there is only CT called 'RL', then a `SimpleRLAgent` can be:
+```python
+class SimpleRLAgent(Agent):
+    """
+    This class serves as an example of simple RL algorithms, which has only one
+    ComputationTask, "RL", i.e., using and learning an RL policy.
+
+    By using different AgentHelpers, this Agent can be applied to either on-
+    policy or off-policy RL algorithms.
+    """
+
+    def __init__(self, env, num_games, reward_shaping_f=lambda x: x):
+        super(SimpleRLAgent, self).__init__(env, num_games)
+        self.reward_shaping_f = reward_shaping_f
+
+    def _cts_store_data(self, observations, actions, states, rewards):
+        assert len(observations) == 1 and len(actions) == 1
+        self._store_data(
+            'RL',
+            dict(
+                sensor=observations[0],
+                action=actions[0],
+                reward=[self.reward_shaping_f(r) for r in rewards]))
+
+    def _cts_predict(self, observations, states):
+        ## each action is already 2D
+        assert len(observations) == 1
+        actions, _ = self.predict('RL', inputs=dict(sensor=observations))
+        return [actions.values()[0][0]], []
+```
+
+Whenever an agent calls `self._store_data` or `self.predict`, it does not actually perform the computation but only puts data in the queues of CDPs. These queues can also be shared by another agent. The CDPs have their own prediction and training loops that will take out the data from the queues, perform the computations, and return the results to agents.
 
 ## Agent Helper <a name="ah"/>
+Each `Agent` has a set of `AgentHelper`s. The number of the helpers is equal to the number of CTs (CDPs), with each helper corresponding to a CT. When the agent calls `self._store_data` or `self.predict`, it has to provide the name of the CT and then the corresponding helper actually calls its own `predict` and `_store_data`:
+```python
+def predict(self, alg_name, inputs, states=dict()):
+    return self.helpers[alg_name].predict(inputs, states)
+
+def _store_data(self, alg_name, data):
+    self.helpers[alg_name]._store_data(self.alive, data)
+```
+A helper's responsibility is to manage data collection for its associated CT. As mentioned in [Computation Task](#ct), a CT might have its own data buffer and sampling schedule. Currently we support two kinds of `AgentHelper`:
+* `OnlineHelper`: This helper stores a small number of the most recent experiences. When sampling, it takes out all the experiences in the buffer for training. This helper is usually used by on-policy algorithms such as Actor-Critic and SARSA. Some off-policy algorithms such as [PPO2](https://blog.openai.com/openai-baselines-ppo/) also uses it.
+* `ExpReplayhelper`: This helper stores a huge number of experiences in a replay buffer. When sampling, it takes a small portion of the entire buffer for training. The sampling strategy could be uniform or [prioritized](https://arxiv.org/abs/1511.05952). Because the buffer is huge, almost all experiences were generated by outdated policies. Thus this helper can only be used by off-policy algorithms such as Q-learning and Off-policy AC.
+
+Eventually we will have an `AgentHelper` matrix for a training setup. An example of 3 agents and 2 CTs is illustrated below:
+
+![](image/agent_helpers.jpg)
 
 ## Manager <a name="manager"/>
+`Manager` is the highest-level concept in FLARE. It creates CTs/CDPs and agents based on the options the user passes in. Once its `start()` is called in the main function, the manager will run CDPs and agents until the termination criterion is met. Currently the manager also maintains a `GameLogger` which is responsible for logging the training and game playing.
+```python
+def start(self):
+    signal.signal(signal.SIGINT, self.__signal_handler)
+    self.logger.start()
+    for cdp in self.CDPs.values():
+        cdp.run()
+    for agent in self.agents:
+        agent.start()
+
+    while self.agents:
+        self.agents[-1].join()
+        self.agents.pop()
+    for cdp in self.CDPs.values():
+        cdp.stop()
+    self.logger.running.value = False
+    self.logger.join()
+```
+
+For an example of how to pass in options to create a `Manager` object, we refer the reader to `<flare_root>/flare/examples/img_ac_example.py`.
