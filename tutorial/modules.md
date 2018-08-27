@@ -13,12 +13,12 @@ There are seven important modules of FLARE in total. Their structural relationsh
 * [Manager](#manager)
 
 ## Model <a name="model"/>
-The `Model` class inherits `torch.nn.Module` and implements the network structure. It defines all the computations that the user wants the network to support. These computation functions will be called by an `Algorithm` object that owns the `Model` object. This class only defines a network but is not responsible for training its parameters.
+The `Model` class inherits from `torch.nn.Module` and implements the network structure. It defines all the computations that the user wants the network to support. These computation functions will be called by an `Algorithm` object that owns the `Model` object. This class only defines a network but is not responsible for training its parameters.
 
 Sometimes after a `Model` is implemented, it might be reused in different scenarios. For example, we have defined a CNN that accepts an image input and outputs several Q values for action control when playing Atari. This same model class can be used by both SARSA and Q-learning, regardless of the their different training objectives.
 
 #### Customization
-To customize a new `Model`, the user needs to inherit the base model defined in `<flare_root>/flare/framework/algorithm.py`. Each model has several specs functions to be defined, and each specs function specifies the formats of input/output data. There are currently four possible specs functions in total:
+To customize a new `Model`, the user needs to inherit from the base model defined in `<flare_root>/flare/framework/algorithm.py`. Each model has several specs functions to be defined, and each specs function specifies the formats of input/output data. There are currently four possible specs functions in total:
 ```python
 @abstractmethod
 def get_input_specs(self):
@@ -79,7 +79,7 @@ The `Algorithm` class implements the prediction and training logic based on a `M
 An `Algorithm` might be reused in different scenarios. For example, given a fixed `SimpleQ` algorithm implementation, we can easily apply it to either an MLP model or a CNN model to account for different observation inputs, without changing the learning objective (both use Q-learning).
 
 #### Customization
-To customize a new `Algorithm`, the user needs to inherit the base algorithm defined in `<flare_root>/flare/framework/algorithm.py`. Two functions need to be overridden:
+To customize a new `Algorithm`, the user needs to inherit from the base algorithm defined in `<flare_root>/flare/framework/algorithm.py`. Two functions need to be overridden:
 ```python
 def predict(self, inputs, states):
     """
@@ -228,7 +228,7 @@ It is most likely that this function does not have to be overriden by the user b
 
 Within this block of code, the user usually has to implement three functions: `_get_init_states`, `_cts_predict` and `_cts_store_data`. The first function needed by memory-augmented agents is explained in details in [Short-term Temporal Memory](memory.md). The second function is called to predict actions given the current environment observations. If there are multiple CTs, the agent is responsible for specifying the calling order of them. The third function is called after the agent gets some feedback from the environment after taking actions (`_step_env`), and this feedback along with the current observations are stored in data buffers. If there are multiple CTs, each CT will have its own data buffer. Thus in `_cts_store_data`, the agent is responsible for implementing what data to store for each CT.
 
-The user can inherit the base `Agent` class to implement these three functions. For example, if there is only CT called 'RL', then a `SimpleRLAgent` can be:
+The user can inherit from the base `Agent` class to implement these three functions. For example, if there is only CT called 'RL', then a `SimpleRLAgent` can be:
 ```python
 class SimpleRLAgent(Agent):
     """
@@ -298,4 +298,4 @@ def start(self):
     self.logger.join()
 ```
 
-For an example of how to pass in options to create an `Manager` object, we refer the reader to `<flare_root>/flare/examples/img_ac_example.py`.
+For an example of how to pass in options to create a `Manager` object, we refer the reader to `<flare_root>/flare/examples/img_ac_example.py`.

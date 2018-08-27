@@ -150,8 +150,9 @@ class TestRecurrentGroup(unittest.TestCase):
         ## 1. For each word in each sentence, we add the word state
         ##    to the word embedding, and the word state keeps the same all the time
         ## 2. We take the last output of the words and the word states
-        ## 3. In the higher level, we multiply the last word output with the sentence state,
-        ##    and update the sentence state by multiplying it with -1
+        ## 3. In the higher level, we multiply the last word output with the sentence state
+        ##    and add it to the mean of the static image input. We update the sentence state
+        ##    by multiplying it with -1
         def step_func(sentence, img, sentence_state, word_state):
             assert isinstance(sentence, list)
 
