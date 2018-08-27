@@ -1,4 +1,5 @@
 import torch.nn as nn
+import numpy as np
 from flare.algorithm_zoo.simple_algorithms import SimpleQ
 from flare.model_zoo.simple_models import SimpleModelQ
 from flare.framework.manager import Manager
@@ -51,19 +52,20 @@ if __name__ == '__main__':
         update_ref_interval=100)
 
     # 3. Specify the settings for learning: data sampling strategy
-    # (OnPolicyHelper here) and other settings used by
+    # (ExpReplayHelper here) and other settings used by
     # ComputationTask.
     ct_settings = {
         "RL": dict(
             num_agents=num_agents,
             algorithm=alg,
-            hyperparas=dict(lr=1e-4),
+            hyperparas=dict(
+                lr=1e-4, grad_clip=5.0),
             # sampling
             agent_helper=ExpReplayHelper,
             buffer_capacity=200000 / num_agents,
             num_experiences=4,  # num per agent
             num_seqs=0,  # sample instances
-            sample_interval=8)
+            sample_interval=5)
     }
 
     # 4. Create Manager that handles the running of the whole pipeline
@@ -71,10 +73,9 @@ if __name__ == '__main__':
 
     # 5. Spawn one agent for each instance of environment.
     #    Agent's behavior depends on the actual algorithm being used. Since we
-    #    are using SimpleAC, a proper type of Agent is SimpleRLAgent.
-    reward_shaping_f = lambda x: x / 100.0
+    #    are using SimpleQ, a proper type of Agent is SimpleRLAgent.
     for env in envs:
-        agent = SimpleRLAgent(env, num_games, reward_shaping_f)
+        agent = SimpleRLAgent(env, num_games, reward_shaping_f=np.sign)
         # An Agent has to be added into the Manager before we can use it to
         # interact with environment and collect data
         manager.add_agent(agent)

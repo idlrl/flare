@@ -1,9 +1,9 @@
 from flare.algorithm_zoo.distributional_rl_algorithms import C51
-from flare.model_zoo.distributional_rl_models import SimpleModelC51
+from flare.model_zoo.distributional_rl_models import C51Model
 from flare.algorithm_zoo.distributional_rl_algorithms import QRDQN
-from flare.model_zoo.distributional_rl_models import SimpleModelQRDQN
+from flare.model_zoo.distributional_rl_models import QRDQNModel
 from flare.algorithm_zoo.distributional_rl_algorithms import IQN
-from flare.model_zoo.distributional_rl_models import SimpleModelIQN
+from flare.model_zoo.distributional_rl_models import IQNModel
 import numpy as np
 import math
 import torch
@@ -17,7 +17,7 @@ class TestC51(unittest.TestCase):
         num_actions = 3
         state_shape = [1]
         mlp = nn.Sequential(nn.Linear(inner_size, inner_size), nn.ReLU())
-        model = SimpleModelC51(
+        model = C51Model(
             dims=state_shape,
             num_actions=num_actions,
             perception_net=mlp,
@@ -127,10 +127,10 @@ class TestQRDQN(unittest.TestCase):
         inner_size = 256
         num_actions = 3
         state_shape = [1]
-        N = 51
+        N = 32
         mlp = nn.Sequential(nn.Linear(inner_size, inner_size), nn.ReLU())
         alg = QRDQN(
-            model=SimpleModelQRDQN(
+            model=QRDQNModel(
                 dims=state_shape,
                 num_actions=num_actions,
                 perception_net=mlp,
@@ -216,7 +216,7 @@ class TestIQN(unittest.TestCase):
         num_actions = 3
         state_shape = [1]
         mlp = nn.Sequential(nn.Linear(inner_size, inner_size), nn.ReLU())
-        model = SimpleModelIQN(
+        model = IQNModel(
             dims=state_shape,
             num_actions=num_actions,
             perception_net=mlp,

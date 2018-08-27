@@ -1,6 +1,6 @@
-from flare.model_zoo.distributional_rl_models import SimpleModelC51
-from flare.model_zoo.distributional_rl_models import SimpleModelQRDQN
-from flare.model_zoo.distributional_rl_models import SimpleModelIQN
+from flare.model_zoo.distributional_rl_models import C51Model
+from flare.model_zoo.distributional_rl_models import QRDQNModel
+from flare.model_zoo.distributional_rl_models import IQNModel
 import torch
 import torch.nn as nn
 import unittest
@@ -15,7 +15,7 @@ class DummyInput():
         return [torch.randn(self.batch_size, self.state_shape)]
 
 
-class TestSimpleModelC51(unittest.TestCase):
+class TestC51Model(unittest.TestCase):
     def test_value(self):
         batch_size = 5
         num_actions = 3
@@ -25,7 +25,7 @@ class TestSimpleModelC51(unittest.TestCase):
         mlp = nn.Sequential(nn.Linear(state_shape[0], 256), nn.ReLU())
         dm = DummyInput(batch_size, state_shape[0])
 
-        model = SimpleModelC51(
+        model = C51Model(
             dims=state_shape,
             num_actions=num_actions,
             perception_net=mlp,
@@ -47,17 +47,17 @@ class TestSimpleModelC51(unittest.TestCase):
                     places=6)
 
 
-class TestSimpleSimpleModelQRDQN(unittest.TestCase):
+class TestQRDQNModel(unittest.TestCase):
     def test_value(self):
         batch_size = 5
         num_actions = 3
         state_shape = [10]
-        N = 51
+        N = 32
         state = None
         mlp = nn.Sequential(nn.Linear(state_shape[0], 256), nn.ReLU())
         dm = DummyInput(batch_size, state_shape[0])
 
-        model = SimpleModelQRDQN(
+        model = QRDQNModel(
             dims=state_shape, num_actions=num_actions, perception_net=mlp, N=N)
         value, a_state = model.value(dm, state)
         q_value_distribution = value["q_value_distribution"]
@@ -73,7 +73,7 @@ class TestSimpleSimpleModelQRDQN(unittest.TestCase):
                     sum(q_value_distribution[i][j].data.tolist()) / N)
 
 
-class TestSimpleModelIQN(unittest.TestCase):
+class TestIQNModel(unittest.TestCase):
     def test_value(self):
         batch_size = 5
         num_actions = 3
@@ -85,7 +85,7 @@ class TestSimpleModelIQN(unittest.TestCase):
         mlp = nn.Sequential(nn.Linear(state_shape[0], inner_size), nn.ReLU())
         dm = DummyInput(batch_size, state_shape[0])
 
-        model = SimpleModelIQN(
+        model = IQNModel(
             dims=state_shape,
             num_actions=num_actions,
             perception_net=mlp,
@@ -108,7 +108,7 @@ class TestSimpleModelIQN(unittest.TestCase):
         mlp = nn.Sequential(nn.Linear(state_shape[0], inner_size), nn.ReLU())
         dm = DummyInput(batch_size, state_shape[0])
 
-        model = SimpleModelIQN(
+        model = IQNModel(
             dims=state_shape,
             num_actions=num_actions,
             perception_net=mlp,
@@ -128,7 +128,7 @@ class TestSimpleModelIQN(unittest.TestCase):
         state_shape = [1]
         inner_size = 256
         mlp = nn.Sequential(nn.Linear(inner_size, inner_size), nn.ReLU())
-        model = SimpleModelIQN(
+        model = IQNModel(
             dims=state_shape,
             num_actions=3,
             perception_net=mlp,

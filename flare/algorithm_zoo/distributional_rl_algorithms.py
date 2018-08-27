@@ -23,18 +23,22 @@ class DistributionalAlgorithm(SimpleQ):
         with torch.no_grad():
             next_values, next_states_update, next_value = self.get_next_values(
                 next_inputs, next_states)
-
             filter = next_alive["alive"]
-            next_expected_q_values = next_value * torch.abs(filter)
-            _, next_action = next_expected_q_values.max(-1)
+
+            ## get next Q distributions for all actions.
             next_q_distributions = self.check_alive(
                 next_values["q_value_distribution"], filter)
-            assert q_distributions.size()[0] == next_q_distributions.size()[0]
-            assert q_distributions.size()[1] == next_q_distributions.size()[1]
 
+            ## get next greedy action on expected Q value.
+            next_expected_q_values = next_value * torch.abs(filter)
+            _, next_action = next_expected_q_values.max(-1)
             next_action = next_action.unsqueeze(-1)
+
+            ## select next Q distribution with action
             next_q_distribution = self.select_q_distribution(
                 next_q_distributions, next_action)
+            ### check batch size.
+            ### distributions may have different numbers of parameters.
             assert q_distribution.size()[0] == next_q_distribution.size()[0]
 
         cost = self.get_cost(q_distribution, next_q_distribution, reward,
@@ -90,7 +94,7 @@ class DistributionalAlgorithm(SimpleQ):
         :return: Tensor (batch_size x num_actions x num_atoms).
             Updated Q value distribution.
         """
-        pass
+        raise NotImplementedError()
 
     def get_cost(self, q_distribution, next_q_distribution, reward, values,
                  next_values):
@@ -105,16 +109,16 @@ class DistributionalAlgorithm(SimpleQ):
         :param next_alive: Dict.
         :return: Tensor (batch_size x 1). Cost.
         """
-        pass
+        raise NotImplementedError()
 
 
 class C51(DistributionalAlgorithm):
     """
     Categorical Algorithm (C51) based on SimpleQ.
-    Refer https://arxiv.org/pdf/1707.06887.pdf for more details.
+    Refer to https://arxiv.org/pdf/1707.06887.pdf for more details.
     "A distributional perspective on reinforcement learning"
 
-    self.model should have members defined in SimpleModelC51 class.
+    self.model should have members defined in C51Model class.
     """
 
     def __init__(self,
@@ -127,15 +131,19 @@ class C51(DistributionalAlgorithm):
         super(C51, self).__init__(model, gpu_id, discount_factor,
                                   exploration_end_steps, exploration_end_rate,
                                   update_ref_interval)
+        vmax = model.vmax
+        vmin = model.vmin
         dead_dist = [0.] * self.model.bins
-        dead_dist[len(dead_dist) / 2] = 1.
+        assert vmin <= 0
+        zero_index = int((len(dead_dist) * -vmin) / (vmax - vmin))
+        dead_dist[zero_index] = 1.
         self.dead_dist = torch.tensor(
             dead_dist, requires_grad=False,
             device=self.device).view(-1, 1, len(dead_dist))
         self.float_vmax = torch.tensor(
-            [model.vmax], requires_grad=False, device=self.device).float()
+            [vmax], requires_grad=False, device=self.device).float()
         self.float_vmin = torch.tensor(
-            [model.vmin], requires_grad=False, device=self.device).float()
+            [vmin], requires_grad=False, device=self.device).float()
 
     def check_alive(self, next_values, next_alive):
         ## if not alive, Q value is deterministically the 0.
@@ -196,7 +204,7 @@ class QRDQN(DistributionalAlgorithm):
     Refer to https://arxiv.org/pdf/1710.10044.pdf for more details.
     "Distributional Reinforcement Learning with Quantile Regression"
 
-    self.model should have members defined in SimpleQRDQN class.
+    self.model should have members defined in QRDQNModel class.
     """
 
     def __init__(self,
@@ -259,7 +267,7 @@ class IQN(QRDQN):
     Refer to https://arxiv.org/pdf/1806.06923.pdf for more details.
     "Implicit Quantile Networks for Distributional Reinforcement Learning"
 
-    self.model should have members defined in SimpleIQN class.
+    self.model should have members defined in IQNModel class.
     """
 
     def __init__(self,

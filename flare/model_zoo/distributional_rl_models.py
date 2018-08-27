@@ -5,12 +5,18 @@ import torch.nn.functional as F
 import math
 
 
-class SimpleModelC51(SimpleModelQ):
-    def __init__(self, dims, num_actions, perception_net, vmax, vmin, bins):
+class C51Model(SimpleModelQ):
+    def __init__(self,
+                 dims,
+                 num_actions,
+                 perception_net,
+                 vmax=10,
+                 vmin=-10,
+                 bins=51):
         assert bins > 1
         assert vmax > vmin
-        super(SimpleModelC51, self).__init__(dims, num_actions * bins,
-                                             perception_net)
+        super(C51Model, self).__init__(dims, num_actions * bins,
+                                       perception_net)
         self.num_actions = num_actions
         self.vmax = vmax
         self.vmin = vmin
@@ -31,10 +37,9 @@ class SimpleModelC51(SimpleModelQ):
             q_value=q_values, q_value_distribution=q_distributions), states
 
 
-class SimpleModelQRDQN(SimpleModelQ):
-    def __init__(self, dims, num_actions, perception_net, N):
-        super(SimpleModelQRDQN, self).__init__(dims, num_actions * N,
-                                               perception_net)
+class QRDQNModel(SimpleModelQ):
+    def __init__(self, dims, num_actions, perception_net, N=32):
+        super(QRDQNModel, self).__init__(dims, num_actions * N, perception_net)
         self.num_actions = num_actions
         tau_hat = torch.tensor(
             [(2 * i + 1.) / (2 * N) for i in xrange(N)],
@@ -52,15 +57,15 @@ class SimpleModelQRDQN(SimpleModelQ):
             tau=self.tau_hat), states
 
 
-class SimpleModelIQN(SimpleModelQ):
+class IQNModel(SimpleModelQ):
     def __init__(self,
                  dims,
                  num_actions,
                  perception_net,
-                 inner_size,
+                 inner_size=256,
                  n=64,
                  default_samples=32):
-        super(SimpleModelIQN, self).__init__(dims, inner_size, perception_net)
+        super(IQNModel, self).__init__(dims, inner_size, perception_net)
         self.num_actions = num_actions
         self.inner_size = inner_size
         pi_base = torch.tensor(
@@ -77,6 +82,13 @@ class SimpleModelIQN(SimpleModelQ):
         return values[0], states
 
     def values(self, inputs, states, nums):
+        """
+        Get a list of values with given sample numbers.
+        :param inputs: same as value()
+        :param states: same as value()
+        :param nums: List(int). List of sample numbers.
+        :return: List(Dict), states. Dict is the same as return in value()
+        """
         assert len(nums) > 0
         psi = self.value_net(inputs.values()[0])
         psi = psi.view(-1, 1, self.inner_size)
@@ -97,6 +109,13 @@ class SimpleModelIQN(SimpleModelQ):
         return values, states
 
     def get_phi(self, batch_size, N):
+        """
+        Get random Phi values with given shape
+        :param batch_size: int. Batch size.
+        :param N: int. Number of Phi values for each sample in batch.
+            sample in a batch.
+        :return: Tensor (batch_size x N). Generated random Phi values.
+        """
         tau = torch.Tensor(batch_size, N)
         if self.pi_base.is_cuda:
             tau = tau.to(self.pi_base.get_device())
