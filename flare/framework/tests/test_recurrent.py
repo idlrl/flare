@@ -123,8 +123,14 @@ class TestRecurrentGroup(unittest.TestCase):
                       [[0.2], [0.2]],                 ## sentence 4
                       [[1.0], [0.2], [0.4], [0.5]]],  ## sentence 5
         ]
+        imgs = [
+            [2.0, 2.0, 2.0],  ## image 1
+            [1.0, 1.0, 1.0]  ## image 2
+        ]
+
         sentence_tensors = rc.make_hierarchy_of_tensors(sentences, "float32",
                                                         "cpu", [1])
+        img_tensors = rc.make_hierarchy_of_tensors(imgs, "float32", "cpu", [3])
 
         sentence_states = [
             [-2, -4, -6, -8],  ## temporal sequence 1
@@ -146,7 +152,7 @@ class TestRecurrentGroup(unittest.TestCase):
         ## 2. We take the last output of the words and the word states
         ## 3. In the higher level, we multiply the last word output with the sentence state,
         ##    and update the sentence state by multiplying it with -1
-        def step_func(sentence, sentence_state, word_state):
+        def step_func(sentence, img, sentence_state, word_state):
             assert isinstance(sentence, list)
 
             def inner_step_func(w, ws):
@@ -168,22 +174,22 @@ class TestRecurrentGroup(unittest.TestCase):
             last_word_states = torch.stack([s[-1] for s in word_states])
             ## we compute the output by multipying the sentence state
             ## with the last word state
-            out = last_outputs * sentence_state
+            out = last_outputs * sentence_state + img.mean(-1).unsqueeze(-1)
             return [out], [sentence_state * -1, last_word_states]
 
         outs, sentence_states, word_states \
             = rc.recurrent_group(seq_inputs=[sentence_tensors],
-                                 insts=[],
+                                 insts=[img_tensors],
                                  init_states=[sentence_state_tensors,
                                               word_state_tensors],
                                  step_func=step_func,
                                  out_states=True)
         self.assertTrue(
             tensor_lists_equal(outs, [
-                torch.tensor([[-3.0, -6.0, -9.0, -12.0], [2.4, 4.8, 7.2, 9.6]
-                              ]), torch.tensor([[0.5, 1.0, 1.5, 2.0], [
-                                  -0.8, -1.6, -2.4, -3.2
-                              ], [0.5, 1.0, 1.5, 2.0]])
+                torch.tensor([[-1.0, -4.0, -7.0, -10.0],
+                              [4.4, 6.8, 9.2, 11.6]]),
+                torch.tensor([[1.5, 2.0, 2.5, 3.0], [0.2, -0.6, -1.4, -2.2],
+                              [1.5, 2.0, 2.5, 3.0]])
             ]))
         self.assertTrue(
             tensor_lists_equal(sentence_states, [
