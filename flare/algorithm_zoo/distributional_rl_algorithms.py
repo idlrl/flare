@@ -6,7 +6,6 @@ import torch
 class DistributionalAlgorithm(SimpleQ):
     def learn(self, inputs, next_inputs, states, next_states, next_alive,
               actions, next_actions, rewards):
-
         if self.update_ref_interval \
                 and self.total_batches % self.update_ref_interval == 0:
             ## copy parameters from self.model to self.ref_model
@@ -133,9 +132,11 @@ class C51(DistributionalAlgorithm):
                                   update_ref_interval)
         vmax = model.vmax
         vmin = model.vmin
+        assert vmax > vmin
         dead_dist = [0.] * self.model.bins
-        assert vmin <= 0
         zero_index = int((len(dead_dist) * -vmin) / (vmax - vmin))
+        assert zero_index >= 0
+        assert zero_index < len(dead_dist)
         dead_dist[zero_index] = 1.
         self.dead_dist = torch.tensor(
             dead_dist, requires_grad=False,
@@ -148,20 +149,18 @@ class C51(DistributionalAlgorithm):
     def check_alive(self, next_values, next_alive):
         ## if not alive, Q value is deterministically the 0.
         alpha = torch.abs(next_alive).view(-1, 1, 1)
-        next_q_distributions = next_values * alpha + self.dead_dist * (1 -
-                                                                       alpha)
-        return next_q_distributions
+        return next_values * alpha + self.dead_dist * (1 - alpha)
 
     def get_cost(self, q_distribution, next_q_distribution, reward, values,
                  next_values):
-        critic_value = self.backup(self.model.atoms, self.float_vmax,
-                                   self.float_vmin, self.model.delta_z, reward,
-                                   self.discount_factor, next_q_distribution)
+        ## back up
+        td_target = self.backup(self.model.atoms, self.float_vmax,
+                                self.float_vmin, self.model.delta_z, reward,
+                                self.discount_factor, next_q_distribution)
         ## Cross-entropy loss
-        cost = -torch.matmul(
-            critic_value.unsqueeze(1),
+        return -torch.matmul(
+            td_target.unsqueeze(1),
             q_distribution.log().unsqueeze(-1)).view(-1, 1)
-        return cost
 
     def backup(self, z, vmax, vmin, delta_z, reward, discount,
                next_q_distribution):
@@ -220,21 +219,21 @@ class QRDQN(DistributionalAlgorithm):
         self.loss = torch.nn.SmoothL1Loss(reduction='none')
 
     def check_alive(self, next_values, next_alive):
-        next_q_distributions = next_values * torch.abs(
-            next_alive.view(-1, 1, 1))
-        return next_q_distributions
+        return next_values * torch.abs(next_alive.view(-1, 1, 1))
 
     def get_cost(self, q_distribution, next_q_distribution, reward, values,
                  next_values):
-        tau = values["tau"]
-        critic_value = reward + self.discount_factor * next_q_distribution
-        cost = self.get_quantile_huber_loss(critic_value, q_distribution, tau)
-        return cost
+        ## back up
+        td_target = reward + self.discount_factor * next_q_distribution
 
-    def get_quantile_huber_loss(self, critic_value, q_distribution, tau):
+        ## cost
+        tau = values["tau"]
+        return self.get_quantile_huber_loss(td_target, q_distribution, tau)
+
+    def get_quantile_huber_loss(self, td_target, q_distribution, tau):
         """
         Quantile Huber loss mentioned in https://arxiv.org/pdf/1710.10044.pdf
-        :param critic_value: Tensor (batch x num_quantiles_a). Target values.
+        :param td_target: Tensor (batch x num_quantiles_a). Target values.
         :param q_distribution: Tensor (batch x num_quantiles_b). Actual values.
         :param tau: Tensor (batch x num_quantiles_a). CDF values. First
             dimention can be broadcaseted.
@@ -242,23 +241,22 @@ class QRDQN(DistributionalAlgorithm):
         """
         ## reshape input tensors
         batch_size, N = q_distribution.size()
-        next_batch_size, next_N = critic_value.size()
+        next_batch_size, next_N = td_target.size()
         assert batch_size == next_batch_size
         assert N == tau.size()[1]
         q_distribution = q_distribution.unsqueeze(1).expand(batch_size, next_N,
                                                             N)
-        critic_value = critic_value.unsqueeze(-1).expand(batch_size, next_N, N)
+        td_target = td_target.unsqueeze(-1).expand(batch_size, next_N, N)
         tau = tau.view(-1, 1, N)
 
         ## compute loss
-        huber_loss = self.loss(q_distribution, critic_value)
-        u = critic_value - q_distribution
+        huber_loss = self.loss(q_distribution, td_target)
+        u = td_target - q_distribution
         delta = u.lt(0).float()
         asymmetric = torch.abs(tau - delta)
         quantile_huber_loss = asymmetric * huber_loss
         cost = quantile_huber_loss.mean(1)
-        cost = cost.sum(-1, keepdim=True)
-        return cost
+        return cost.sum(-1, keepdim=True)
 
 
 class IQN(QRDQN):
@@ -283,6 +281,9 @@ class IQN(QRDQN):
         super(IQN, self).__init__(model, gpu_id, discount_factor,
                                   exploration_end_steps, exploration_end_rate,
                                   update_ref_interval)
+        assert N > 0
+        assert N_prime > 0
+        assert K > 0
         self.N = N
         self.N_prime = N_prime
         self.K = K

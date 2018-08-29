@@ -39,6 +39,7 @@ class C51Model(SimpleModelQ):
 
 class QRDQNModel(SimpleModelQ):
     def __init__(self, dims, num_actions, perception_net, N=32):
+        assert N > 0
         super(QRDQNModel, self).__init__(dims, num_actions * N, perception_net)
         self.num_actions = num_actions
         tau_hat = torch.tensor(
@@ -65,6 +66,9 @@ class IQNModel(SimpleModelQ):
                  inner_size=256,
                  n=64,
                  default_samples=32):
+        assert inner_size > 0
+        assert n > 0
+        assert default_samples > 0
         super(IQNModel, self).__init__(dims, inner_size, perception_net)
         self.num_actions = num_actions
         self.inner_size = inner_size
