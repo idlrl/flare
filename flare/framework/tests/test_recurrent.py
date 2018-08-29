@@ -36,12 +36,12 @@ class TestHierarchyTensorTranspose(unittest.TestCase):
 
 class TestRecurrentGroup(unittest.TestCase):
     def test_multi_sequential_inputs(self):
-        ## we first make a batch of temporal sequences of sentences
+        ## we first make a batch of paragraphs of sentences
         ## Let's suppose that each word has a 1d embedding
-        sentences = [## temporal sequence 1
+        sentences = [## paragraph 1
                      [[[0.3], [0.4], [0.5]],          ## sentence 1
                       [[0.1], [0.2]]],                ## sentence 2
-                     ## temporal sequence 2
+                     ## paragraph 2
                      [[[0.3], [0.4], [0.5]],          ## sentence 3
                       [[0.2], [0.2]],                 ## sentence 4
                       [[1.0], [0.2], [0.4], [0.5]]],  ## sentence 5
@@ -49,11 +49,11 @@ class TestRecurrentGroup(unittest.TestCase):
         sentence_tensors = rc.make_hierarchy_of_tensors(sentences, "float32",
                                                         "cpu", [1])
 
-        ## we then make a batch of temporal sequences of images
-        images = [## temporal sequence 1
+        ## we then make a batch of paragraphs of images
+        images = [## paragraph 1
                   [[0.1, 0.3],                 ## image 1
                    [0, -1]],                   ## image 2
-                  ## temporal sequence 2
+                  ## paragraph 2
                   [[0, 1],                     ## image 3
                    [1, 0],                     ## image 4
                    [1, 1]],                    ## image 5
@@ -62,8 +62,8 @@ class TestRecurrentGroup(unittest.TestCase):
                                                      [2])
 
         states = [
-            [-2, -4, -6, -8],  ## temporal sequence 1
-            [-1, -2, -3, -4],  ## temporal sequence 2
+            [-2, -4, -6, -8],  ## paragraph 1
+            [-1, -2, -3, -4],  ## paragraph 2
         ]
         state_tensors = rc.make_hierarchy_of_tensors(states, "float32", "cpu",
                                                      [4])
@@ -115,10 +115,10 @@ class TestRecurrentGroup(unittest.TestCase):
                 ]))
 
     def test_hierchical_sequences(self):
-        sentences = [## temporal sequence 1
+        sentences = [## paragraph 1
                      [[[0.3], [0.4], [0.5]],          ## sentence 1
                       [[0.1], [0.2]]],                ## sentence 2
-                     ## temporal sequence 2
+                     ## paragraph 2
                      [[[0.3], [0.4], [0.5]],          ## sentence 3
                       [[0.2], [0.2]],                 ## sentence 4
                       [[1.0], [0.2], [0.4], [0.5]]],  ## sentence 5
@@ -133,8 +133,8 @@ class TestRecurrentGroup(unittest.TestCase):
         img_tensors = rc.make_hierarchy_of_tensors(imgs, "float32", "cpu", [3])
 
         sentence_states = [
-            [-2, -4, -6, -8],  ## temporal sequence 1
-            [-1, -2, -3, -4],  ## temporal sequence 2
+            [-2, -4, -6, -8],  ## paragraph 1
+            [-1, -2, -3, -4],  ## paragraph 2
         ]
         sentence_state_tensors = rc.make_hierarchy_of_tensors(
             sentence_states, "float32", "cpu", [4])
