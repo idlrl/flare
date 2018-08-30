@@ -108,3 +108,6 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# pre-commit
+--git-common-dir/
