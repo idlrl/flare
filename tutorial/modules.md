@@ -2,7 +2,8 @@
 
 There are seven important modules of FLARE in total. Their structural relationships are illustrated by the figure below.
 
-![](image/flare_structure.jpg)
+<!-- Use html to show images -->
+<p><img src="image/flare_structure.jpg" style="width:40%"></p>
 
 * [Model](#model)
 * [Algorithm](#algorithm)
@@ -34,7 +35,7 @@ def get_action_specs(self):
 def get_reward_specs(self):
     return [("reward", dict(shape=[1]))]
 ```
-where `get_state_specs` and `get_reward_specs` are optional. By default, the model is expected not to use temporal memory (empty state specs) and receives a single scalar reward.
+where `get_state_specs` and `get_reward_specs` are optional. By default, the model is expected not to use short-term memory (empty state specs) and receives a single scalar reward.
 
 The `(name props)` tuples returned by a specs function serve the purpose of retrieving required data from a collection of inputs. For example, suppose the original input is a dictionary `{a=x, b=y, c=z}` where `a,b,c` are data names and `x,y,z` are data, and the `Model` wants to use data `a` and `b` as its network inputs. Then the user could write
 ```python
@@ -172,7 +173,7 @@ def get_input_specs(self):
 ```
 Then in both `predict()` and `learn()`, the user can expect to get the corresponding inputs by `inputs["sensor"]`.
 
-For now, let's skip the explanations for `states`, `pred_states` and `next_states`. They are only needed if the agent has short-term temporal memory. In that case, we refer the reader to [Short-term Temporal Memory](memory.md) for details. The rest of the arguments are explained below:
+For now, let's skip the explanations for `states`, `pred_states` and `next_states`. They are only needed if the agent has short-term memory. In that case, we refer the reader to [Short-term Memory](memory.md) for details. The rest of the arguments are explained below:
 
 Predict:
 * `inputs`: the observation inputs at the current time step
@@ -192,7 +193,7 @@ For an agent, each CT is a neural blackbox. A CT receives numpy arrays and outpu
 ## Computation Data Processor <a name="cdp"/>
 `ComputationDataProcessor` (CDP) is a data feeder class designed for `ComputationTask`. Every CT is associated with its own CDP. In the case where we want to use multiple identical agents to speed up the data collection for a CT, the associated CDP is responsible for packing and unpacking multi-agent data. Its job is to record which experiences are from which agents in a learning/prediction batch, in order to return the results to the correct agents after the computations of the CT. A CDP directly communicates with multiple agents, and maintains two loops: `_prediction_loop()` and `_training_loop()` until program termination.
 
-![](image/agent_cdp_ct.jpg)
+<p><img src="image/agent_cdp_ct.jpg" style="width:35%"></p>
 
 ## Agent <a name="agent"/>
 An `Agent` implements the high-level logic of how to interact with the environment and how to collect experiences for learning. It basically runs for a predefined number of game episodes, and for each episode executes the code in `_run_one_episode()`. Inside this function, it coordinates between CTs to generate response to the environment.
@@ -226,7 +227,7 @@ def _run_one_episode(self):
 
 It is most likely that this function does not have to be overriden by the user because that its logic is very general. The logic is also quite critical: we suggest a user to have a deep understanding of the agent-environment interaction process before modifying `_run_one_episode()` for a specific purpose. Otherwise the training data might not be correctly collected (e.g., incorrect episode-end behavior for training).
 
-Within this block of code, the user usually has to implement three functions: `_get_init_states`, `_cts_predict` and `_cts_store_data`. The first function needed by memory-augmented agents is explained in details in [Short-term Temporal Memory](memory.md). The second function is called to predict actions given the current environment observations. If there are multiple CTs, the agent is responsible for specifying the calling order of them. The third function is called after the agent gets some feedback from the environment after taking actions (`_step_env`), and this feedback along with the current observations are stored in data buffers. If there are multiple CTs, each CT will have its own data buffer. Thus in `_cts_store_data`, the agent is responsible for implementing what data to store for each CT.
+Within this block of code, the user usually has to implement three functions: `_get_init_states`, `_cts_predict` and `_cts_store_data`. The first function needed by memory-augmented agents is explained in details in [Short-term Memory](memory.md). The second function is called to predict actions given the current environment observations. If there are multiple CTs, the agent is responsible for specifying the calling order of them. The third function is called after the agent gets some feedback from the environment after taking actions (`_step_env`), and this feedback along with the current observations are stored in data buffers. If there are multiple CTs, each CT will have its own data buffer. Thus in `_cts_store_data`, the agent is responsible for implementing what data to store for each CT.
 
 The user can derive from the base `Agent` class to implement these three functions. For example, if there is only CT called 'RL', then a `SimpleRLAgent` can be:
 ```python
@@ -253,7 +254,6 @@ class SimpleRLAgent(Agent):
                 reward=[self.reward_shaping_f(r) for r in rewards]))
 
     def _cts_predict(self, observations, states):
-        ## each action is already 2D
         assert len(observations) == 1
         actions, _ = self.predict('RL', inputs=dict(sensor=observations))
         return [actions.values()[0][0]], []
@@ -276,7 +276,7 @@ A helper's responsibility is to manage data collection for its associated CT. As
 
 Eventually we will have an `AgentHelper` matrix for a training setup. An example of 3 agents and 2 CTs is illustrated below:
 
-![](image/agent_helpers.jpg)
+<p><img src="image/agent_helpers.jpg" style="width:70%"></p>
 
 ## Manager <a name="manager"/>
 `Manager` is the highest-level concept in FLARE. It creates CTs/CDPs and agents based on the options the user passes in. Once its `start()` is called in the main function, the manager will run CDPs and agents until the termination criterion is met. Currently the manager also maintains a `GameLogger` which is responsible for logging the training and game playing.

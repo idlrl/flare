@@ -74,6 +74,8 @@ def recurrent_group(seq_inputs,
     seq_inputs: collection of sequences, each being either a tensor or a list
     insts: collection of static instances, each being a tensor
     init_states: collection of initial states, each being a tensor
+    step_func: the function applied to the stripped inputs
+    out_states: if True, also output the hidden states produced in the process
     """
     assert isinstance(seq_inputs, list)
     assert isinstance(insts, list)
