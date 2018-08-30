@@ -1,7 +1,7 @@
 # Short-term Memory for Embodied Agents
-So far we have talked about how to train memoryless agents in FLARE, namely, agents that make decisions only based on current observations. This is fine for some simple problems when the observations capture the full state/history of the environment (e.g., in the case of [Go](https://en.wikipedia.org/wiki/Go_(game)) where the current board configuration summarizes the entire history of a game), or the decision itself is independent of past decisions (e.g., a 3D agent needs to fire whenever an enemy stands at the center of its view otherwise it will die). However, in practice, most interesting problems that involve [sequential decision making](https://en.wikipedia.org/wiki/Sequential_decision_making) (e.g., 3D navigation and multi-round question answering) would require some kind of memory from the agent.
+So far we have talked about how to train memoryless agents in FLARE, namely, agents that make decisions only based on current observations. This is fine for some simple problems when the observations capture the full state/history of the environment (e.g., in the case of Go where the current board configuration summarizes the entire history of a game), or the decision itself is independent of past decisions (e.g., a 3D agent needs to fire whenever an enemy stands at the center of its view otherwise it will die). However, in practice, most interesting problems (e.g., 3D navigation and multi-round question answering) would require some kind of memory from the agent.
 
-FLARE has a good support for [short-term working memory](https://en.wikipedia.org/wiki/Short-term_memory). In our scenario of training embodied agents, short-term memory informally refers to quantities that are persistent (but modifiable) throughout an entire episode, from the beginning to the end. Memory that lasts for the entire life of the agent is informally called [long-term memory](https://en.wikipedia.org/wiki/Long-term_memory) and is not yet supported in FLARE.
+FLARE has a good support for short-term memory. In our scenario of training embodied agents, short-term memory informally refers to quantities that are persistent (but modifiable) throughout an entire episode, from the beginning to the end. Memory that lasts for the entire life of the agent is informally called long-term memory and is not yet supported in FLARE.
 
 ## Sequential perception inputs <a name="inputs"/>
 The perceived data of an embodied agent in one episode are naturally sequential in time. For example, observed image frames all together consistute a video where consecutive frames have a temporal dependency. Moreoever, within each time step, the agent might receive other sequential data such as sentences. Thus in its most general form, a perception input is a multi-level hierarchy of sequences. An example is illustrated below:
@@ -20,10 +20,10 @@ sentences = [## paragraph 1
 ]
 ```
 In the above four-level example,
-* at level 3, we have word embeddings of size 1;
-* at level 2, we have sentences of lengths (3, 2,  3, 2, 4);
-* at level 1, we have paragraphs of lengths (2, 3);
-* at level 0, we have a batch of 2 paragraphs.
+* at level 3, we have 14 word embeddings of size 1;
+* at level 2, we have 5 sentences of lengths (3, 2, 3, 2, 4);
+* at level 1, we have 2 paragraphs of lengths (2, 3);
+* at level 0, we have 1 batch of 2 paragraphs.
 
 ***NOTE: Sequences at level 0 are always temporally independent to each other.***
 

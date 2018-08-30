@@ -254,7 +254,6 @@ class SimpleRLAgent(Agent):
                 reward=[self.reward_shaping_f(r) for r in rewards]))
 
     def _cts_predict(self, observations, states):
-        ## each action is already 2D
         assert len(observations) == 1
         actions, _ = self.predict('RL', inputs=dict(sensor=observations))
         return [actions.values()[0][0]], []
