@@ -8,21 +8,22 @@ A file for wrapping different environments to have a unified API interface
 used by Agent's control flow.
 """
 
+
 class Env(object):
     """
     An abstract class for environment. A new environment should inherit this
     class
     """
-    
+
     __metaclass__ = ABCMeta
-    
+
     @abstractmethod
     def reset(self):
         """
         reset the environment and return the initial observation
         """
         pass
-    
+
     @abstractmethod
     def step(self, actions, actrep):
         """
@@ -31,7 +32,7 @@ class Env(object):
         and the next game over.
         """
         pass
-    
+
     @abstractmethod
     def observation_dims(self):
         """
@@ -40,7 +41,7 @@ class Env(object):
         Each list contains the dimension numbers of that input.
         """
         pass
-    
+
     @abstractmethod
     def action_dims(self):
         """
@@ -52,7 +53,7 @@ class Env(object):
         if language, then it means the cardinality of the dictionary
         """
         pass
-    
+
     @abstractmethod
     def time_out(self):
         """
@@ -65,7 +66,7 @@ class XWorldEnv(Env):
     """
     A wrapper for XWorld env.
     """
-    
+
     def __init__(self, game_name, contexts=1, options=None, dict=None):
         """
         options: see test_xworld3d.py in XWorld for an example of options
@@ -79,44 +80,45 @@ class XWorldEnv(Env):
         self.dict_w2id = {v: k for k, v in dict.iteritems()}
         self.height, self.width, self.channels = \
                                         self.env.get_screen_out_dimensions()
-    
-    
+
     def preprocess_observation(self, ob):
         screen = ob['screen'].reshape([self.channels, self.height, self.width])
-        sentence = [np.array(self.dict_w2id(word)) for word in 
-                        ob['sentence'].split(" ")]
-        
+        sentence = [
+            np.array(self.dict_w2id(word))
+            for word in ob['sentence'].split(" ")
+        ]
+
         return screen, sentence
-    
+
     def reset(self):
         ## should return a list of observations
         self.env.reset_game()
         init_ob = self.env.get_state()
-        screen, sentence = self.preprocess_observation(init_ob) 
+        screen, sentence = self.preprocess_observation(init_ob)
 
         self.buf = [np.zeros(screen.shape).astype(screen.dtype) \
                     for i in range(self.contexts - 1)]
         ## the newest state is the last element
         self.buf.append(screen)
-        
+
         ## concat along the channel dimension
         return [np.concatenate(self.buf), sentence]
-
 
     def step(self, actions, actrep=1):
         assert len(actions) == 2, "xworld requires two actions, one action, \
                                    one language"
+
         a = actions[0]
         if "int" in str(a.dtype):
             a = a[0]
-        
+
         sentence = " ".join([self.dict_id2w(id) for id in actions[1]])
-        
-        total_reward = self.env.take_actions({"action": a, 
-                                               "pred_sentence": sentence}, 
-                                               actrep,
-                                               False)
-        
+
+        total_reward = self.env.take_actions({
+            "action": a,
+            "pred_sentence": sentence
+        }, actrep, False)
+
         next_game_over = self.env.game_over() != "alive"
         next_ob = self.env.get_state()
 
@@ -127,17 +129,16 @@ class XWorldEnv(Env):
         return [np.concatenate(self.buf), sentence], \
                [total_reward], next_game_over
 
-
     def observation_dims(self):
-        screen_shape = [self.contexts*self.channels, self.height, self.width]
+        screen_shape = [self.contexts * self.channels, self.height, self.width]
         sentence_shape = [len(self.dict_id2w.keys())]
-        
+
         return [screen_shape, sentence_shape]
 
     def action_dims(self):
         num_actions = self.env.get_num_actions()
         return [num_actions, len(self.dict_id2w.keys())]
-    
+
     def time_out(self):
         return "max_step" in self.env.game_over()
 
@@ -165,10 +166,10 @@ class GymEnv(Env):
         self.buf.append(init_ob)
         ## concat along the channel dimension
         return [np.concatenate(self.buf)]
-    
+
     def time_out(self):
         return self.steps >= self.gym_env._max_episode_steps - 1
-    
+
     def render(self):
         self.gym_env.render()
 
