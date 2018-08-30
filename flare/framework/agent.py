@@ -275,7 +275,7 @@ class Agent(Process):
         observations = self._reset_env()
         states = self._get_init_states()  ## written by user
 
-        while self.alive and (not self._game_timeout()):
+        while self.alive and (not self.env.time_out()):
             actions, next_states = self._cts_predict(
                 observations, states)  ## written by user
             assert isinstance(actions, list)
@@ -289,7 +289,7 @@ class Agent(Process):
             self.alive = 1 - int(next_game_over)
 
         actions, _ = self._cts_predict(observations, states)
-        if self._game_timeout():
+        if self.env.time_out():
             self.alive = -1
         self._cts_store_data(observations, actions, states, [0] * len(rewards))
 
@@ -297,22 +297,13 @@ class Agent(Process):
 
     def _reset_env(self):
         self.alive = 1
-        self.steps = 0
         ## currently we only support a single logger for all CTs
         self.log_entry = GameLogEntry(self.id, 'All')
         obs = self.env.reset()
         assert isinstance(obs, list)
-        self.max_steps = self.env.get_max_steps()
         return obs
 
-    def _game_timeout(self):
-        ## For OpenAI gym, end one step earlier to avoid
-        ## getting the game_over signal
-
-        return self.steps >= self.max_steps - 1
-
     def _step_env(self, actions):
-        self.steps += 1
         next_observations, rewards, next_game_over = self.env.step(actions)
         assert isinstance(next_observations, list)
         assert isinstance(rewards, list)

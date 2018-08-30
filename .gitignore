@@ -97,6 +97,8 @@ ENV/
 # Spyder project settings
 .spyderproject
 .spyproject
+.project
+.pydevproject
 
 # Rope project settings
 .ropeproject

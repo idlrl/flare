@@ -1,25 +1,162 @@
 import gym
 import numpy as np
 from scipy import misc
+from abc import ABCMeta, abstractmethod
+from py_simulator import Simulator
 """
 A file for wrapping different environments to have a unified API interface
 used by Agent's control flow.
 """
 
+class Env(object):
+    """
+    An abstract class for environment. A new environment should inherit this
+    class
+    """
+    
+    __metaclass__ = ABCMeta
+    
+    @abstractmethod
+    def reset(self):
+        """
+        reset the environment and return the initial observation
+        """
+        pass
+    
+    @abstractmethod
+    def step(self, actions, actrep):
+        """
+        Given a list of ordered actions, forward the environment actrep step.
+        The output should be a list of next observations, a list of rewards,
+        and the next game over.
+        """
+        pass
+    
+    @abstractmethod
+    def observation_dims(self):
+        """
+        Return a list of lists as observation dimensions, each list for one 
+        observation.
+        Each list contains the dimension numbers of that input.
+        """
+        pass
+    
+    @abstractmethod
+    def action_dims(self):
+        """
+        Return a list of integers as action dimensions, each integer for an action.
+        For each integer,
+        if the corresponding action is discrete, then it means
+        the total number of actions;
+        if continous, then it means the length of the action vector.
+        if language, then it means the cardinality of the dictionary
+        """
+        pass
+    
+    @abstractmethod
+    def time_out(self):
+        """
+        Return a boolean of whether the env has timed out 
+        """
+        pass
 
-class GymEnv(object):
+
+class XWorldEnv(Env):
+    """
+    A wrapper for XWorld env.
+    """
+    
+    def __init__(self, game_name, contexts=1, options=None, dict=None):
+        """
+        options: see test_xworld3d.py in XWorld for an example of options
+        dict: dictionary for the langauge part. key=id, value=word
+        """
+        self.env = Simulator.create(game_name, options)
+        assert contexts >= 1, "contexts must be a positive number!"
+        self.contexts = contexts
+        self.buf = None
+        self.dict_id2w = dict
+        self.dict_w2id = {v: k for k, v in dict.iteritems()}
+        self.height, self.width, self.channels = \
+                                        self.env.get_screen_out_dimensions()
+    
+    
+    def preprocess_observation(self, ob):
+        screen = ob['screen'].reshape([self.channels, self.height, self.width])
+        sentence = [np.array(self.dict_w2id(word)) for word in 
+                        ob['sentence'].split(" ")]
+        
+        return screen, sentence
+    
+    def reset(self):
+        ## should return a list of observations
+        self.env.reset_game()
+        init_ob = self.env.get_state()
+        screen, sentence = self.preprocess_observation(init_ob) 
+
+        self.buf = [np.zeros(screen.shape).astype(screen.dtype) \
+                    for i in range(self.contexts - 1)]
+        ## the newest state is the last element
+        self.buf.append(screen)
+        
+        ## concat along the channel dimension
+        return [np.concatenate(self.buf), sentence]
+
+
+    def step(self, actions, actrep=1):
+        assert len(actions) == 2, "xworld requires two actions, one action, \
+                                   one language"
+        a = actions[0]
+        if "int" in str(a.dtype):
+            a = a[0]
+        
+        sentence = " ".join([self.dict_id2w(id) for id in actions[1]])
+        
+        total_reward = self.env.take_actions({"action": a, 
+                                               "pred_sentence": sentence}, 
+                                               actrep,
+                                               False)
+        
+        next_game_over = self.env.game_over() != "alive"
+        next_ob = self.env.get_state()
+
+        screen, sentence = self.preprocess_observation(next_ob)
+        self.buf.append(screen)
+        if len(self.buf) > self.contexts:
+            self.buf.pop(0)
+        return [np.concatenate(self.buf), sentence], \
+               [total_reward], next_game_over
+
+
+    def observation_dims(self):
+        screen_shape = [self.contexts*self.channels, self.height, self.width]
+        sentence_shape = [len(self.dict_id2w.keys())]
+        
+        return [screen_shape, sentence_shape]
+
+    def action_dims(self):
+        num_actions = self.env.get_num_actions()
+        return [num_actions, len(self.dict_id2w.keys())]
+    
+    def time_out(self):
+        return "max_step" in self.env.game_over()
+
+
+class GymEnv(Env):
     """
     A convenient wrapper for OpenAI Gym env. Used to unify the
     environment interfaces.
     """
 
-    def __init__(self, game_name, contexts=1):
+    def __init__(self, game_name, contexts=1, options=None):
         self.gym_env = gym.make(game_name)
         assert contexts >= 1, "contexts must be a positive number!"
         self.contexts = contexts
         self.buf = None
+        self.steps = 0
 
     def reset(self):
+        self.steps = 0
         ## should return a list of observations
         init_ob = self.preprocess_observation(self.gym_env.reset())
         self.buf = [np.zeros(init_ob.shape).astype(init_ob.dtype) \
@@ -28,10 +165,10 @@ class GymEnv(object):
         self.buf.append(init_ob)
         ## concat along the channel dimension
         return [np.concatenate(self.buf)]
-
-    def get_max_steps(self):
-        return self.gym_env._max_episode_steps
-
+    
+    def time_out(self):
+        return self.steps >= self.gym_env._max_episode_steps - 1
+    
     def render(self):
         self.gym_env.render()
 
@@ -49,6 +186,7 @@ class GymEnv(object):
         total_reward = 0
         next_game_over = False
         for i in range(actrep):
+            self.steps += 1
             next_ob, reward, game_over, _ = self.gym_env.step(a)
             total_reward += reward
             next_game_over = next_game_over | game_over
@@ -70,10 +208,6 @@ class GymEnv(object):
         return ob.astype("float32")
 
     def observation_dims(self):
-        """
-        Return a list of tuples as input dimensions, each tuple for an input.
-        Each tuple contains the dimension numbers of that input.
-        """
         shape = self.gym_env.observation_space.shape
         ## only the first dim has several contexts
         ## Gym has a single input
@@ -81,12 +215,6 @@ class GymEnv(object):
 
     def action_dims(self):
         """
-        Return a list of integers as action dimensions, each integer for an action.
-        For each integer,
-        if the corresponding action is discrete, then it means
-        the total number of actions;
-        if continous, then it means the length of the action vector.
-
         Gym has a single action.
         """
         act_space = self.gym_env.action_space
