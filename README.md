@@ -1,5 +1,4 @@
 # FLARE
-https://idlrl.github.io/flare
 
 ## Design
 
@@ -27,7 +26,7 @@ To add the repository to your python paths permanently, append the following lin
 export PYTHONPATH=<flare_root>:$PYTHONPATH
 ```
 
-## A quick tutorial in 5 minutes
+## A quick tutorial in five minutes
 Some quick examples can be found in `flare/examples`. Below we show step-by-step code to train the "CartPole-v0" game from OpenAI Gym.
 
 a) First we import different Python modules which all together constitute the overall training pipeline. Some modules such as ```SimpleAC```, ```SimpleModelAC```, and ```SimpleRLAgent``` were already implemented by us as *examples* of Algorithm, Model, and Agent classes. The users are encouraged to modify or write their own for more complex problems. This advanced topic of user customizing modules is explained in details in [Modules](tutorial/modules.md).
@@ -164,17 +163,21 @@ cd <flare_root>; python flare/example/img_ac_example.py
 ```
 Without much hyperparameter tweaking, after a total number of 100k games, the game reward is expected to reach 250, trained with 16 agents with a rollout length of 5. The reward curve is shown below.
 
-#### Assault-v0
-We can directly change the game from Breakout to [Assault](https://en.wikipedia.org/wiki/Assault_(1983_video_game)) in `img_ac_example.py` and train the agent again. The reward exceeds 1k after 100k games.
+#### Other Atari games
+We can directly change the game from Breakout to other Atari games such as [Assault](https://en.wikipedia.org/wiki/Assault_(1983_video_game)) in `img_ac_example.py` and train the agent again. The reward exceeds 1k after 100k games.
 
 
 | Breakout | Assault |
-|----|----|
+|:----:|:----:|
+|![](tutorial/image/breakout.png)|![](tutorial/image/assault.png)|
 |![](tutorial/image/reward_curve_breakout.png)|![](tutorial/image/reward_curve_assault.png)|
 
+## Read more
+For advanced usage of FLARE, you might want to take a look at the documentation below.
 
-## Advanced usage
-For advanced usage of FLARE, you might want to take a look at a more comprehensive [tutorial](tutorial/index.md).
+* [Modules of FLARE](tutorial/modules.md)
+* [Agents with Short-term Memory](tutorial/memory.md)
+* [Link a Simulator to FLARE](tutorial/simulator.md)
 
 ## License
 FLARE has the Apache 2.0 license.

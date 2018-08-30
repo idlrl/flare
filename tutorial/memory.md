@@ -105,6 +105,34 @@ Note that in step 3, shorter sequences might lack the *i-th* instance. As a resu
 An example is illustrated below.
 <p><img src="image/batch_processing.png" style="width:100%"></p>
 
+#### Static inputs
+There is a special type of inputs to `recurrent_group`, i.e., static inputs `insts`. Each static input has only two levels and is a batch of static instances. The static instances are supposed to match the sequence inputs at the current level:
+* The number of static instances should be equal to the number of sequences.
+* Each static input pairs with a sequence and remains *constant* throughout the processing of that sequence.
+
+For example, in image question answering, the input image remains constant during the processing of the paired sentence.
+
+It should be noted that a sequential input A could be converted to a static input to pair with a sequential input B after being stripped one or more levels, for example:
+```python
+## 'imgs' is A and 'sentences' is B
+sentences = [## paragraph 1
+             [[[0.3], [0.4], [0.5]],          ## sentence 1
+              [[0.1], [0.2]]],                ## sentence 2
+             ## paragraph 2
+             [[[0.3], [0.4], [0.5]],          ## sentence 3
+              [[0.2], [0.2]],                 ## sentence 4
+              [[1.0], [0.2], [0.4], [0.5]]],  ## sentence 5
+]
+imgs = [
+    [[2.0, 2.0, 2.0],  ## image 1
+     [3.0, 3.0, 3.0]], ## image 2
+    [[1.0, 1.0, 1.0],  ## image 3
+     [4.0, 4.0, 4.0],  ## image 4
+     [5.0, 5.0, 5.0]]  ## image 5
+]
+```
+After first calling `recurrent_group` on both `sentences` and `imgs` as `seq_inputs`, inside the step function, the user could use `imgs` as 5 static images (`insts`) for the 5 sentences and call `recurrent_group` on them again.
+
 #### Code example
 A concrete code example of using `recurrent_group` to process sequential data can be found in `<flare_root>/flare/framework/tests/test_recurrent.py`:
 ```python
