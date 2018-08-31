@@ -167,7 +167,6 @@ class ComputationTask(object):
         rewards = self._create_tensors(rewards, self.alg.get_reward_specs())
 
         for i in range(self.alg.iterations_per_batch):
-            costs, _, _ = self.alg.learn(inputs, next_inputs, states,
-                                         next_states, next_alive, actions,
-                                         next_actions, rewards)
+            costs = self.alg.learn(inputs, next_inputs, states, next_states,
+                                   next_alive, actions, next_actions, rewards)
         return self._retrieve_np_arrays(costs)

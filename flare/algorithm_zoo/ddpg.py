@@ -175,6 +175,4 @@ class DDPG(Algorithm):
         policy_loss.backward()
         self.policy_optim.step()
 
-        return dict(cost=critic_loss + policy_loss), \
-               states_update, \
-               next_states_update
+        return dict(cost=critic_loss + policy_loss)

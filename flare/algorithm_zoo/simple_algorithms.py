@@ -5,6 +5,7 @@ import torch
 import torch.optim as optim
 from flare.framework.algorithm import Algorithm
 from flare.framework import common_functions as comf
+import flare.framework.recurrent as rc
 
 
 class SimpleAC(Algorithm):
@@ -31,9 +32,8 @@ class SimpleAC(Algorithm):
         self.optim = optim[0](self.model.parameters(), **optim[1])
         self.grad_clip = grad_clip
 
-    def learn(self, inputs, next_inputs, states, next_states, next_alive,
-              actions, next_actions, rewards):
-
+    def _rl_learn(self, inputs, next_inputs, states, next_states, next_alive,
+                  actions, next_actions, rewards):
         action = actions["action"]
         reward = rewards["reward"]
 
@@ -66,6 +66,23 @@ class SimpleAC(Algorithm):
                - self.prob_entropy_weight * dist.entropy()  ## increase entropy for exploration
 
         avg_cost = comf.get_avg_cost(cost)
+        avg_cost.backward(retain_graph=True)
+
+        return dict(cost=cost), states_update, next_states_update
+
+    def learn(self, inputs, next_inputs, states, next_states, next_alive,
+              actions, next_actions, rewards):
+        if states:
+            costs = rc.call_recurrent_group(
+                self._rl_learn, inputs, next_inputs, states, next_states,
+                next_alive, actions, next_actions, rewards)
+        else:
+            costs, states_update, next_states_update = self._rl_learn(
+                inputs, next_inputs, states, next_states, next_alive, actions,
+                next_actions, rewards)
+
+        cost = costs["cost"]
+        avg_cost = comf.get_avg_cost(cost)
         self.optim.zero_grad()
         avg_cost.backward(retain_graph=True)
 
@@ -74,7 +91,7 @@ class SimpleAC(Algorithm):
                                            self.grad_clip)
         self.optim.step()
 
-        return dict(cost=cost), states_update, next_states_update
+        return dict(cost=cost)
 
     def predict(self, inputs, states):
         return self._rl_predict(self.model, inputs, states)
@@ -176,7 +193,7 @@ class SimpleQ(Algorithm):
                                            self.grad_clip)
         self.optim.step()
 
-        return dict(cost=cost), states_update, next_states_update
+        return dict(cost=cost)
 
 
 class SimpleSARSA(SimpleQ):
@@ -225,7 +242,7 @@ class SimpleSARSA(SimpleQ):
                                            self.grad_clip)
         self.optim.step()
 
-        return dict(cost=cost), states_update, next_states_update
+        return dict(cost=cost)
 
 
 class OffPolicyAC(Algorithm):
@@ -309,7 +326,7 @@ class OffPolicyAC(Algorithm):
                                            self.grad_clip)
         self.optim.step()
 
-        return dict(cost=cost), states_update, next_states_update
+        return dict(cost=cost)
 
     def predict(self, inputs, states):
         return self._rl_predict(self.model, inputs, states)

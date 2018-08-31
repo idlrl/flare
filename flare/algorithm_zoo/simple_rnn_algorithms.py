@@ -75,21 +75,32 @@ class SimpleRNNAC(Algorithm):
               actions, next_actions, rewards):
         self.optim.zero_grad()
         assert states
+        # `lens` and `keys` are required by the step function
+        lens = [
+            len(inputs), len(next_inputs), len(next_alive), len(actions),
+            len(next_actions), len(rewards), len(states), len(next_states)
+        ]
+        keys = dict(
+            inputs=inputs.keys(),
+            next_inputs=next_inputs.keys(),
+            states=states.keys(),
+            next_states=next_states.keys(),
+            next_alive=next_alive.keys(),
+            actions=actions.keys(),
+            next_actions=next_actions.keys(),
+            rewards=rewards.keys())
+
         # rc_out stores all outputs by recurrent_group
         rc_out = rc.recurrent_group(
-            inputs=inputs,
-            next_inputs=next_inputs,
-            states=states,
-            next_states=next_states,
-            next_alive=next_alive,
-            actions=actions,
-            next_actions=next_actions,
-            rewards=rewards,
-            # TODO: if insts is not [], step_func in recurrent group would
-            # fail
-            insts=[],
-            step_func=(
-                lambda lens, keys, *args: rc.step_func(self.__learn, lens, keys, *args)
+                seq_inputs=inputs.values() + \
+                           next_inputs.values() + \
+                           next_alive.values() + \
+                           actions.values() + \
+                           next_actions.values() + \
+                           rewards.values(),
+                init_states=states.values() + next_states.values(),
+                insts=[],
+                step_func=(lambda *args: rc.step_func(self.__learn, lens, keys, *args)
             ))
         # get cost terms from rc_out
         costs = dict(zip(self.cost_keys, rc_out))

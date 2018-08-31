@@ -93,5 +93,4 @@ class SuccessorRepresentationQ(SimpleQ):
         avg_cost = comf.get_avg_cost(reward_cost + sr_cost)
         avg_cost.backward(retain_graph=True)
 
-        return dict(
-            cost=reward_cost + sr_cost), states_update, next_states_update
+        return dict(cost=reward_cost + sr_cost)

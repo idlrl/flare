@@ -18,13 +18,12 @@ if __name__ == '__main__':
     envs = []
     for _ in range(num_agents):
         envs.append(GymEnv(game))
-    state_shape = envs[-1].observation_space.shape[0]
-    action_space = envs[-1].action_space
-    action_dims = action_space.shape[0]
+    state_shape = envs[-1].observation_dims()[0]
+    action_dims = envs[-1].action_dims()
 
     alg = DDPG(
         model=ContinuousDeterministicModel(
-            input_dims=state_shape, action_dims=action_space.shape[0]),
+            input_dims=state_shape[0], action_dims=action_dims[0]),
         update_ref_interval=1,
         update_weight=0.001,
         # DDPG requires different optimizer settings for policy and critic.

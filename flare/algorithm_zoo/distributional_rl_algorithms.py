@@ -4,6 +4,19 @@ import torch
 
 
 class DistributionalAlgorithm(SimpleQ):
+    def __init__(self,
+                 model,
+                 gpu_id=-1,
+                 discount_factor=0.99,
+                 exploration_end_steps=0,
+                 exploration_end_rate=0.1,
+                 update_ref_interval=100,
+                 optim=(optim.RMSprop, dict(lr=1e-4)),
+                 grad_clip=None):
+        super(C51, self).__init__(model, gpu_id, discount_factor,
+                                  exploration_end_steps, exploration_end_rate,
+                                  update_ref_interval, optim, grad_clip)
+
     def learn(self, inputs, next_inputs, states, next_states, next_alive,
               actions, next_actions, rewards):
         if self.update_ref_interval \
@@ -45,7 +58,7 @@ class DistributionalAlgorithm(SimpleQ):
         avg_cost = comf.get_avg_cost(cost)
         avg_cost.backward(retain_graph=True)
 
-        return dict(cost=cost), states_update, next_states_update
+        return dict(cost=cost)
 
     def select_q_distribution(self, q_distributions, action):
         """

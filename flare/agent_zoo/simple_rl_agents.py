@@ -84,16 +84,14 @@ class ActionNoiseAgent(SimpleRLAgent):
     `DDPG`.
     """
 
-    def __init__(self, env, num_games, action_noise):
-        super(ActionNoiseAgent, self).__init__(env, num_games)
+    def __init__(self,
+                 env,
+                 num_games,
+                 action_noise,
+                 reward_shaping_f=lambda x: x):
+        super(ActionNoiseAgent, self).__init__(env, num_games,
+                                               reward_shaping_f)
         self.action_noise = action_noise
-
-    def _cts_store_data(self, observations, actions, states, rewards):
-        assert len(observations) == 1 and len(actions) == 1
-        self._store_data(
-            'RL',
-            dict(
-                sensor=observations[0], action=actions[0], reward=rewards))
 
     def _cts_predict(self, observations, states):
         ## each action is already 2D
