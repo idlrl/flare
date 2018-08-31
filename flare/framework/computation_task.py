@@ -45,21 +45,22 @@ class ComputationTask(object):
         self.name = name
         self.hp = hyperparas
         if model_dir == "":
-            self.model_file = ""
+            self.model_dir = ""
         else:
             os.system("mkdir -p " + model_dir)
-            self.model_file = model_dir
+            self.model_dir = model_dir
         self.alg = algorithm
         self.optim = optim.RMSprop(
             self.alg.model.parameters(), lr=hyperparas["lr"])
         self._cdp_args = kwargs
         self._cdp = None
-        ## if model_file is not empty, then we load an init model
-        if self.model_file != "":
-            models = glob.glob(self.model_file + "/*")
+        ## if model_dir is not empty, then we load an init model
+        if self.model_dir != "":
+            models = glob.glob(self.model_dir + "/*")
             if models:
                 ## for now, we take the most recent model
-                most_recent_model_file = sorted(models)[-1]
+                most_recent_model_pass = sorted(models)[-1]
+                most_recent_model_file = most_recent_model_pass + "/" + self.name + ".w"
                 self.alg.model.load_state_dict(
                     torch.load(most_recent_model_file))
                 glog.info("CT[%s] model loaded from '%s'" %
@@ -67,8 +68,10 @@ class ComputationTask(object):
         self.model_save_signal = Value('i', -1)
 
     def save_model(self, idx):
-        if self.model_file != "":
-            model_file = "%s/%s-%06d.w" % (self.model_file, self.name, idx)
+        if self.model_dir != "":
+            model_file = "%s/%06d/%s.w" % (self.model_dir, idx, self.name)
+            ## create a directory for the current pass
+            os.system("mkdir -p " + os.path.dirname(model_file))
             torch.save(self.alg.model.state_dict(), model_file)
             glog.info("CT[%s] model saved to '%s'" % (self.name, model_file))
 
