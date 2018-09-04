@@ -4,7 +4,7 @@ from flare.algorithm_zoo.simple_algorithms import SimpleQ
 from flare.framework.manager import Manager
 from flare.model_zoo.simple_models import SimpleModelQ
 from flare.framework.agent import ExpReplayHelper
-from flare.framework.env import GymEnv
+from flare.env_zoo.gym_env import GymEnv
 from flare.agent_zoo.simple_rl_agents import SimpleRLAgent
 
 if __name__ == '__main__':
