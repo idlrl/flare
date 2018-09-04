@@ -18,17 +18,18 @@ class Manager(object):
             `ComputationTask`.
         """
         self.agents = []
+        self.logger = GameLogger(
+            timeout=1,
+            print_interval=log_settings["print_interval"],
+            model_save_interval=log_settings["model_save_interval"])
         self.cts = {}
         self.CDPs = {}
         for name, setting in ct_settings.iteritems():
             setting["model_dir"] = log_settings["model_dir"]
             self.cts[name] = ComputationTask(name, **setting)
             self.CDPs[name] = self.cts[name].CDP
-        self.logger = GameLogger(
-            timeout=1,
-            print_interval=log_settings["print_interval"],
-            model_save_interval=log_settings["model_save_interval"],
-            cts=self.cts)
+            self.logger.model_save_signals.append(self.cts[name]
+                                                  .model_save_signal)
 
     def __signal_handler(self, sig, frame):
         # this is still not good, as we don't get a chance to normally stop

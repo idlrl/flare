@@ -1,6 +1,5 @@
 import os
 import glog
-import glob
 import torch
 import torch.optim as optim
 from algorithm import Model, Algorithm
@@ -8,6 +7,7 @@ import recurrent as rc
 import numpy as np
 import operator
 from flare.framework.computation_data_processor import ComputationDataProcessor
+from multiprocessing import Value
 
 
 def split_list(l, sizes):
@@ -44,30 +44,36 @@ class ComputationTask(object):
         self.name = name
         self.hp = hyperparas
         if model_dir == "":
-            self.model_file = ""
+            self.model_dir = ""
         else:
             os.system("mkdir -p " + model_dir)
-            self.model_file = model_dir + "/" + name
+            self.model_dir = model_dir
         self.alg = algorithm
         self.optim = optim.RMSprop(
             self.alg.model.parameters(), lr=hyperparas["lr"])
         self._cdp_args = kwargs
         self._cdp = None
-        ## if model_file is not empty, then we load an init model
-        if self.model_file != "":
-            models = glob.glob(self.model_file)
-            if models:
+        ## if model_dir is not empty, then we load an init model
+        if self.model_dir != "":
+            if os.path.isdir(self.model_dir + "/lastest"):
                 ## for now, we take the most recent model
-                most_recent_model_file = sorted(models)[-1]
-                self.alg.model.load_state_dict(
-                    torch.load(most_recent_model_file))
-                glog.info("Loading the model " + most_recent_model_file)
+                latest_model_file = self.model_dir + "/lastest/" + self.name + ".w"
+                self.alg.model.load_state_dict(torch.load(latest_model_file))
+                glog.info("CT[%s] model loaded from '%s'" %
+                          (self.name, latest_model_file))
+        self.model_save_signal = Value('i', -1)
 
     def save_model(self, idx):
-        if self.model_file != "":
-            model_file = "%s%06d" % (self.model_file, idx)
-            ## TODO: CUDA error
+        if self.model_dir != "":
+            model_file = "%s/%06d/%s.w" % (self.model_dir, idx, self.name)
+            lastest_model_file = "%s/lastest/%s.w" % (self.model_dir,
+                                                      self.name)
+            ## create a directory for the current pass
+            os.system("mkdir -p " + os.path.dirname(model_file))
+            os.system("mkdir -p " + os.path.dirname(lastest_model_file))
             torch.save(self.alg.model.state_dict(), model_file)
+            torch.save(self.alg.model.state_dict(), lastest_model_file)
+            glog.info("CT[%s] model saved to '%s'" % (self.name, model_file))
 
     def get_state_specs(self):
         return self.alg.get_state_specs()
@@ -153,6 +159,10 @@ class ComputationTask(object):
         This function is responsible to convert Python numpy arrays to pytorch
         tensors, and then convert the computational results in the reverse way.
         """
+
+        if self.model_save_signal.value >= 0:
+            self.save_model(self.model_save_signal.value)
+            self.model_save_signal.value = -1
 
         inputs = self._create_tensors(inputs, self.alg.get_input_specs())
         next_inputs = self._create_tensors(next_inputs,

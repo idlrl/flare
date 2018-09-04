@@ -71,8 +71,8 @@ class GymEnv(object):
 
     def observation_dims(self):
         """
-        Return a list of lists as input dimensions, each list for an input.
-        Each list contains the dimension numbers of that input.
+        Return a list of tuples as input dimensions, each tuple for an input.
+        Each tuple contains the dimension numbers of that input.
         """
         shape = self.gym_env.observation_space.shape
         ## only the first dim has several contexts
