@@ -75,7 +75,7 @@ class XWorldEnv(Env):
 
     def action_dims(self):
         num_actions = self.env.get_num_actions()
-        return (num_actions, len(self.dict_id2w.keys()))
+        return [num_actions, len(self.dict_id2w.keys())]
 
     def time_out(self):
         return "max_step" in self.env.game_over()

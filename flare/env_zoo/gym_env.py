@@ -81,8 +81,8 @@ class GymEnv(Env):
         """
         act_space = self.gym_env.action_space
         if isinstance(act_space, gym.spaces.Discrete):
-            return (act_space.n, )
-        return act_space.shape
+            return [act_space.n]
+        return list(act_space.shape)
 
 
 class GymEnvImage(GymEnv):

@@ -16,7 +16,7 @@ class Env(object):
     @abstractmethod
     def reset(self):
         """
-        reset the environment and return a list of initial observations
+        Reset the environment and return a list of initial observations
         """
         pass
 
@@ -32,16 +32,16 @@ class Env(object):
     @abstractmethod
     def observation_dims(self):
         """
-        Return a list of tuples as observation dimensions, each list for one 
+        Return a list of tuples as observation dimensions, each tuple for one 
         observation.
-        Each list contains the dimension numbers of that input.
+        Each tuple contains the dimension numbers of that input.
         """
         pass
 
     @abstractmethod
     def action_dims(self):
         """
-        Return a tuple of integers as action dimensions, each integer for an 
+        Return a list of integers as action dimensions, each integer for an 
         action. For each integer, if the corresponding action is discrete, 
         then it means the total number of actions;
         if continous, then it means the length of the action vector.
