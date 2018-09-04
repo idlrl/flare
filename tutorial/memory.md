@@ -131,7 +131,7 @@ imgs = [
      [5.0, 5.0, 5.0]]  ## image 5
 ]
 ```
-After first calling `recurrent_group` on both `sentences` and `imgs` as `seq_inputs`, inside the step function, the user could use `imgs` as 5 static images (`insts`) for the 5 sentences and call `recurrent_group` on them again.
+After first calling `recurrent_group` on both `sentences` and `imgs` as `seq_inputs`, inside the step function, the user could use `imgs` as five static images (`insts`) for the five sentences and call `recurrent_group` on them again.
 
 #### Code example
 A concrete code example of using `recurrent_group` to process sequential data can be found in `<flare_root>/flare/framework/tests/test_recurrent.py`:

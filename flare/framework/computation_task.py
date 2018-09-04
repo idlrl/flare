@@ -1,6 +1,5 @@
 import os
 import glog
-import glob
 import torch
 import torch.optim as optim
 from algorithm import Model, Algorithm
@@ -56,23 +55,24 @@ class ComputationTask(object):
         self._cdp = None
         ## if model_dir is not empty, then we load an init model
         if self.model_dir != "":
-            models = glob.glob(self.model_dir + "/*")
-            if models:
+            if os.path.isdir(self.model_dir + "/lastest"):
                 ## for now, we take the most recent model
-                most_recent_model_pass = sorted(models)[-1]
-                most_recent_model_file = most_recent_model_pass + "/" + self.name + ".w"
-                self.alg.model.load_state_dict(
-                    torch.load(most_recent_model_file))
+                latest_model_file = self.model_dir + "/lastest/" + self.name + ".w"
+                self.alg.model.load_state_dict(torch.load(latest_model_file))
                 glog.info("CT[%s] model loaded from '%s'" %
-                          (self.name, most_recent_model_file))
+                          (self.name, latest_model_file))
         self.model_save_signal = Value('i', -1)
 
     def save_model(self, idx):
         if self.model_dir != "":
             model_file = "%s/%06d/%s.w" % (self.model_dir, idx, self.name)
+            lastest_model_file = "%s/lastest/%s.w" % (self.model_dir,
+                                                      self.name)
             ## create a directory for the current pass
             os.system("mkdir -p " + os.path.dirname(model_file))
+            os.system("mkdir -p " + os.path.dirname(lastest_model_file))
             torch.save(self.alg.model.state_dict(), model_file)
+            torch.save(self.alg.model.state_dict(), lastest_model_file)
             glog.info("CT[%s] model saved to '%s'" % (self.name, model_file))
 
     def get_state_specs(self):
