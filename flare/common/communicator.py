@@ -105,16 +105,16 @@ class AgentCommunicator(Communicator):
         self.training_return_q = Queue(1)
         self.prediction_return_q = Queue(1)
 
-    def put_training_data(self, exp_seqs):
-        isinstance(exp_seqs, list)
-        self.training_q.put((self.agent_id, exp_seqs))
+    def put_training_data(self, data, size):
+        assert isinstance(data, dict)
+        self.training_q.put((self.agent_id, (data, size)))
 
     def get_training_return(self):
         return self.training_return_q.get()
 
-    def put_prediction_data(self, data):
-        isinstance(data, dict)
-        self.prediction_q.put((self.agent_id, data))
+    def put_prediction_data(self, data, size):
+        assert isinstance(data, dict)
+        self.prediction_q.put((self.agent_id, (data, size)))
 
     def get_prediction_return(self):
         return self.prediction_return_q.get()

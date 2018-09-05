@@ -93,7 +93,7 @@ class AgentHelper(object):
             right form.
         """
         data = dict(inputs=inputs, states=states)
-        self.comm.put_prediction_data((data, 1))
+        self.comm.put_prediction_data(data, 1)
         ret = self.comm.get_prediction_return()
         return ret
 
@@ -143,7 +143,7 @@ class AgentHelper(object):
         if not exp_seqs:
             return
         data, size = self.unpack_exps(exp_seqs)
-        self.comm.put_training_data((data, size))
+        self.comm.put_training_data(data, size)
         ret = self.comm.get_training_return()
 
 
