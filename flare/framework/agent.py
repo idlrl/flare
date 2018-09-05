@@ -254,7 +254,8 @@ class Agent(Process):
         ## The reason for this conversion is that we want to reuse the
         ## _pack_data() and _unpack_data() of the CDP for handling both training
         ## and prediction data. These two functions assume that data are stored
-        ## as mini batches instead of single instances in a buffer.
+        ## as mini batches instead of single instances in the prediction and learning
+        ## queues.
         inputs_ = {k: [v] for k, v in inputs.iteritems()}
         states_ = {k: [v] for k, v in states.iteritems()}
         prediction, next_states = self.helpers[alg_name].predict(inputs_,
