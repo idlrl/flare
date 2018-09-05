@@ -48,9 +48,9 @@ class Manager(object):
     def add_agent(self, agent):
         agent.id = len(self.agents)
         # `Agent` needs to know the state specs to prepare state data
-        agent.make_initial_states(
+        agent.cts_state_specs = \
             {k: v.get_state_specs()
-             for k, v in self.cts.iteritems()})
+             for k, v in self.cts.iteritems()}
         self.agents.append(agent)
         for name, cdp in self.CDPs.iteritems():
             agent.add_agent_helper(

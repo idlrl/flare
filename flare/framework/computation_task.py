@@ -135,15 +135,15 @@ class ComputationTask(object):
         inputs = self._create_tensors(inputs, self.alg.get_input_specs())
         states = self._create_tensors(states, self.alg.get_state_specs())
         with torch.no_grad():
-            pred_actions, pred_states = self.alg.predict(inputs, states)
+            pred_actions, next_states = self.alg.predict(inputs, states)
         pred_actions = self._retrieve_np_arrays(pred_actions)
-        pred_states = self._retrieve_np_arrays(pred_states)
+        next_states = self._retrieve_np_arrays(next_states)
 
         ## these are the action and state names expected in the outputs of predict()
         action_names = sorted(
             [name for name, _ in self.alg.get_action_specs()])
         state_names = sorted([name for name, _ in self.alg.get_state_specs()])
-        return pred_actions, pred_states
+        return pred_actions, next_states
 
     def learn(self,
               inputs,

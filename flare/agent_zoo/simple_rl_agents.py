@@ -26,8 +26,8 @@ class SimpleRLAgent(Agent):
 
     def _cts_predict(self, observations, states):
         assert len(observations) == 1
-        actions, _ = self.predict('RL', inputs=dict(sensor=observations))
-        return [actions.values()[0][0]], []
+        actions, _ = self.predict('RL', inputs=dict(sensor=observations[0]))
+        return [actions["action"]], []
 
 
 class SimpleRNNRLAgent(Agent):
@@ -44,7 +44,10 @@ class SimpleRNNRLAgent(Agent):
         self.reward_shaping_f = reward_shaping_f
 
     def _get_init_states(self):
-        return self.init_states['RL'].values()
+        return [
+            self._make_zero_states(prop)
+            for _, prop in self.cts_state_specs['RL']
+        ]
 
     def _cts_store_data(self, observations, actions, states, rewards):
         assert len(observations) == 1 and len(actions) == 1
@@ -60,5 +63,7 @@ class SimpleRNNRLAgent(Agent):
     def _cts_predict(self, observations, states):
         assert len(observations) == 1 and len(states) == 1
         actions, next_states = self.predict(
-            'RL', inputs=dict(sensor=observations), states=dict(state=states))
-        return [actions.values()[0][0]], [next_states.values()[0][0]]
+            'RL',
+            inputs=dict(sensor=observations[0]),
+            states=dict(state=states[0]))
+        return [actions["action"]], next_states.values()
