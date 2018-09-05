@@ -10,7 +10,7 @@ from flare.model_zoo.distributional_rl_models import IQNModel
 from flare.framework.manager import Manager
 from flare.agent_zoo.simple_rl_agents import SimpleRLAgent
 from flare.framework.agent import ExpReplayHelper
-from flare.framework.env import GymEnvImage
+from flare.env_zoo.gym_env import GymEnvImage
 from flare.framework.common_functions import Flatten
 
 

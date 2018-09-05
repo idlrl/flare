@@ -4,7 +4,7 @@ from flare.framework.manager import Manager
 from flare.model_zoo.simple_models import SimpleModelAC
 from flare.agent_zoo.simple_rl_agents import SimpleRLAgent
 from flare.framework.agent import OnlineHelper
-from flare.framework.env import GymEnv
+from flare.env_zoo.gym_env import GymEnv
 
 if __name__ == '__main__':
     """
