@@ -82,6 +82,8 @@ class GameLogger(Process):
             self.__flush_log()
             if self.counter % (self.print_interval * self.model_save_interval
                                ) == 0:
+                ## No matter which pass is loaded, the model will be saved starting
+                ## from pass 1
                 self.__save_models(self.counter / self.print_interval /
                                    self.model_save_interval)
 

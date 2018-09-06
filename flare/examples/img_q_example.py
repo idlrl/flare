@@ -58,8 +58,7 @@ if __name__ == '__main__':
         "RL": dict(
             num_agents=num_agents,
             algorithm=alg,
-            hyperparas=dict(
-                lr=1e-4, grad_clip=5.0),
+            hyperparas=dict(grad_clip=5.0),
             # sampling
             agent_helper=ExpReplayHelper,
             buffer_capacity=200000 / num_agents,
