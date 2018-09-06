@@ -11,8 +11,12 @@ class SimpleRLAgent(Agent):
     policy or off-policy RL algorithms.
     """
 
-    def __init__(self, env, num_games, reward_shaping_f=lambda x: x):
-        super(SimpleRLAgent, self).__init__(env, num_games)
+    def __init__(self,
+                 env,
+                 num_games,
+                 learning=True,
+                 reward_shaping_f=lambda x: x):
+        super(SimpleRLAgent, self).__init__(env, num_games, learning)
         self.reward_shaping_f = reward_shaping_f
 
     def _cts_store_data(self, observations, actions, states, rewards):
@@ -39,8 +43,12 @@ class SimpleRNNRLAgent(Agent):
     policy or off-policy RL algorithms.
     """
 
-    def __init__(self, env, num_games, reward_shaping_f=lambda x: x):
-        super(SimpleRNNRLAgent, self).__init__(env, num_games)
+    def __init__(self,
+                 env,
+                 num_games,
+                 learning=True,
+                 reward_shaping_f=lambda x: x):
+        super(SimpleRNNRLAgent, self).__init__(env, num_games, learning)
         self.reward_shaping_f = reward_shaping_f
 
     def _get_init_states(self):

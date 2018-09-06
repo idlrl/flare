@@ -208,9 +208,10 @@ class Agent(Process):
     the environment and does computation. It is a subclass of Process. The entry
     function of the Agent process is run().
 
-    Agent has the following members:
-    env: the environment
+    Some members:
+    env:        the environment
     num_games:  number of games to run
+    learning:   Whether learn or not (only do testing)
     helpers:    a dictionary of `AgentHelper`, each corresponds to one
                 `ComputationTask`
     log_q:      communication channel between `Agent` and the centralized logger
@@ -218,16 +219,17 @@ class Agent(Process):
     """
     __metaclass__ = ABCMeta
 
-    def __init__(self, env, num_games):
+    def __init__(self, env, num_games, learning):
         super(Agent, self).__init__()
         self.id = -1  # just created, not added to the Robot yet
         self.env = env
         self.num_games = num_games
+        self.learning = learning
         self.state_specs = None
         self.helpers = {}
         self.log_q = None
         self.running = Value('i', 0)
-        self.daemon = True
+        self.daemon = True  ## Process member
         self.alive = 1
 
     def add_agent_helper(self, helper, input_keys, action_keys, state_keys,
@@ -277,7 +279,8 @@ class Agent(Process):
         self.running.value = 0
 
     def _store_data(self, alg_name, data):
-        self.helpers[alg_name]._store_data(self.alive, data)
+        if self.learning:
+            self.helpers[alg_name]._store_data(self.alive, data)
 
     def _run_one_episode(self):
         observations = self._reset_env()
