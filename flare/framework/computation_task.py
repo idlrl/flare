@@ -1,4 +1,5 @@
 import os
+import glob
 import glog
 import torch
 import torch.optim as optim
@@ -36,13 +37,15 @@ class ComputationTask(object):
     def __init__(self,
                  name,
                  algorithm,
-                 hyperparas=dict(
-                     lr=1e-4, grad_clip=0),
+                 hyperparas=dict(),
                  model_dir="",
+                 pass_num=0,
                  **kwargs):
+        self.hp = dict(lr=1e-4, grad_clip=0)
+        self.hp.update(hyperparas)
+
         assert isinstance(algorithm, Algorithm)
         self.name = name
-        self.hp = hyperparas
         if model_dir == "":
             self.model_dir = ""
         else:
@@ -50,17 +53,21 @@ class ComputationTask(object):
             self.model_dir = model_dir
         self.alg = algorithm
         self.optim = optim.RMSprop(
-            self.alg.model.parameters(), lr=hyperparas["lr"])
+            self.alg.model.parameters(), lr=self.hp["lr"])
         self._cdp_args = kwargs
         self._cdp = None
         ## if model_dir is not empty, then we load an init model
         if self.model_dir != "":
-            if os.path.isdir(self.model_dir + "/lastest"):
-                ## for now, we take the most recent model
-                latest_model_file = self.model_dir + "/lastest/" + self.name + ".w"
-                self.alg.model.load_state_dict(torch.load(latest_model_file))
+            if glob.glob(self.model_dir + "/*"):
+                if pass_num > 0:
+                    model_file = self.model_dir + ("/%06d/%s.w" %
+                                                   (pass_num, self.name))
+                else:
+                    ## otherwise we take the most recent model
+                    model_file = self.model_dir + "/lastest/" + self.name + ".w"
+                self.alg.model.load_state_dict(torch.load(model_file))
                 glog.info("CT[%s] model loaded from '%s'" %
-                          (self.name, latest_model_file))
+                          (self.name, model_file))
         self.model_save_signal = Value('i', -1)
 
     def save_model(self, idx):
@@ -135,15 +142,15 @@ class ComputationTask(object):
         inputs = self._create_tensors(inputs, self.alg.get_input_specs())
         states = self._create_tensors(states, self.alg.get_state_specs())
         with torch.no_grad():
-            pred_actions, pred_states = self.alg.predict(inputs, states)
+            pred_actions, next_states = self.alg.predict(inputs, states)
         pred_actions = self._retrieve_np_arrays(pred_actions)
-        pred_states = self._retrieve_np_arrays(pred_states)
+        next_states = self._retrieve_np_arrays(next_states)
 
         ## these are the action and state names expected in the outputs of predict()
         action_names = sorted(
             [name for name, _ in self.alg.get_action_specs()])
         state_names = sorted([name for name, _ in self.alg.get_state_specs()])
-        return pred_actions, pred_states
+        return pred_actions, next_states
 
     def learn(self,
               inputs,

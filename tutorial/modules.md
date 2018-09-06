@@ -150,7 +150,7 @@ The function signatures of CT's `predict()` and `learn()` are
 ```python
 def predict(self, inputs, states=None):
     ...
-    return pred_actions, pred_states
+    return pred_actions, next_states
 
 def learn(self,
           inputs,
@@ -173,7 +173,7 @@ def get_input_specs(self):
 ```
 Then in both `predict()` and `learn()`, the user can expect to get the corresponding inputs by `inputs["sensor"]`.
 
-For now, let's skip the explanations for `states`, `pred_states` and `next_states`. They are only needed if the agent has short-term memory. In that case, we refer the reader to [Short-term Memory](memory.md) for details. The rest of the arguments are explained below:
+For now, let's skip the explanations for `states` and `next_states`. They are only needed if the agent has short-term memory. In that case, we refer the reader to [Short-term Memory](memory.md) for details. The rest of the arguments are explained below:
 
 Predict:
 * `inputs`: the observation inputs at the current time step
@@ -255,17 +255,28 @@ class SimpleRLAgent(Agent):
 
     def _cts_predict(self, observations, states):
         assert len(observations) == 1
-        actions, _ = self.predict('RL', inputs=dict(sensor=observations))
-        return [actions.values()[0][0]], []
+        actions, _ = self.predict('RL', inputs=dict(sensor=observations[0]))
+        return [actions["action"]], []
 ```
 
-Whenever an agent calls `self._store_data` or `self.predict`, it does not actually perform the computation but only puts data in the queues of CDPs. These queues can also be shared by another agent. The CDPs have their own prediction and training loops that will take out the data from the queues, perform the computations, and return the results to agents.
+The agent stores and predicts data at the current time step. For either storing or prediction, the data will be wrapped as a dictionary whose keys should match the keywords specified in the defined `Model` specs. Whenever the agent calls `self._store_data` or `self.predict`, it does not actually perform the computation but only puts data in the queues of CDPs. These queues can also be shared by another agent. The CDPs have their own prediction and training loops that will take out the data from the queues, perform the computations, and return the results to agents.
 
 ## Agent Helper <a name="ah"/>
 Each `Agent` has a set of `AgentHelper`s. The number of the helpers is equal to the number of CTs (CDPs), with each helper corresponding to a CT. When the agent calls `self._store_data` or `self.predict`, it has to provide the name of the CT and then the corresponding helper actually calls its own `predict` and `_store_data`:
 ```python
 def predict(self, alg_name, inputs, states=dict()):
-    return self.helpers[alg_name].predict(inputs, states)
+    ## Convert single instances to batches of size 1
+    ## The reason for this conversion is that we want to reuse the
+    ## _pack_data() and _unpack_data() of the CDP for handling both training
+    ## and prediction data. These two functions assume that data are stored
+    ## as mini batches instead of single instances in a buffer.
+    inputs_ = {k : [v] for k, v in inputs.iteritems()}
+    states_ = {k : [v] for k, v in states.iteritems()}
+    prediction, next_states = self.helpers[alg_name].predict(inputs_, states_)
+    ## convert back to single instances
+    prediction = {k : v[0] for k, v in prediction.iteritems()}
+    next_states = {k : v[0] for k, v in next_states.iteritems()}
+    return prediction, next_states
 
 def _store_data(self, alg_name, data):
     self.helpers[alg_name]._store_data(self.alive, data)

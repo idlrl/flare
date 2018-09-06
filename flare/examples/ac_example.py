@@ -47,9 +47,9 @@ if __name__ == '__main__':
 
     # 4. Create Manager that handles the running of the whole pipeline
     manager = Manager(
-        ct_settings,
-        log_settings=dict(
-            print_interval=100, model_dir="/tmp/test", model_save_interval=10))
+        ct_settings, log_settings=dict(
+            model_dir="/tmp/test", pass_num=0)
+    )  ## if pass_num is less than 1, then load the newest model
 
     # 5. Spawn one agent for each instance of environment.
     #    Agent's behavior depends on the actual algorithm being used. Since we

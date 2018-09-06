@@ -55,8 +55,7 @@ if __name__ == '__main__':
     ct_settings = {
         "RL": dict(
             algorithm=alg,
-            hyperparas=dict(
-                lr=1e-4, grad_clip=5.0),
+            hyperparas=dict(grad_clip=5.0),
             # sampling
             agent_helper=OnlineHelper,
             # each agent will call `learn()` every `sample_interval` steps

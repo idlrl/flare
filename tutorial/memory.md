@@ -1,7 +1,7 @@
 # Short-term Memory for Embodied Agents
 So far we have talked about how to train memoryless agents in FLARE, namely, agents that make decisions only based on current observations. This is fine for some simple problems when the observations capture the full state/history of the environment (e.g., in the case of Go where the current board configuration summarizes the entire history of a game), or the decision itself is independent of past decisions (e.g., a 3D agent needs to fire whenever an enemy stands at the center of its view otherwise it will die). However, in practice, most interesting problems (e.g., 3D navigation and multi-round question answering) would require some kind of memory from the agent.
 
-FLARE has a good support for short-term memory. In our scenario of training embodied agents, short-term memory informally refers to quantities that are persistent (but modifiable) throughout an entire episode, from the beginning to the end. Memory that lasts for the entire life of the agent is informally called long-term memory and is not yet supported in FLARE.
+FLARE supports short-term memory. In our scenario of training embodied agents, short-term memory informally refers to quantities that are persistent (but modifiable) throughout an entire episode, from the beginning to the end. Memory that lasts for the entire life of the agent is informally called long-term memory and is not yet supported in FLARE.
 
 ## Sequential perception inputs <a name="inputs"/>
 The perceived data of an embodied agent in one episode are naturally sequential in time. For example, observed image frames all together consistute a video where consecutive frames have a temporal dependency. Moreoever, within each time step, the agent might receive other sequential data such as sentences. Thus in its most general form, a perception input is a multi-level hierarchy of sequences. An example is illustrated below:
@@ -27,7 +27,7 @@ In the above four-level example,
 
 ***NOTE: Sequences at level 0 are always temporally independent to each other.***
 
-## States as short-term memory
+## States as short-term memory <a name="states"/>
 In FLARE, a state is defined to be a vector that boots the processing of a sequence. A state--representing short-term memory--could be any vector that is persistent throughout a sequence, and is not restricted to an RNN state. For example, a state might just be a binary value computed at time 1 and passed down all the way to the sequence end.
 
 Once defined, we require that the number of distinct states at a given level cannot be altered across time steps. For example, suppose that an agent has two RNN states at time 1 at level 1, then there should always be exactly two RNN states passed from each time step to the next time step at level 1.
@@ -228,3 +228,78 @@ def test_hierchical_sequences(self):
         ]))
 ```
 Try to get a deep understanding of the above example. After that, you will realize the potential of `recurrent_group`!
+
+## Agents with states
+An agent with short-term memory and sequential inputs will call `recurrent_group` to handle prediction and learning. It needs some additional considerations compared to a memoryless agent, shown below.
+
+#### Define model specs
+To define the model of an agent with states, the user needs to override the `get_state_specs` function, which outputs a list of pairs of state names and properties.
+
+#### Define initial states
+For each state, the user has to specify its initial value before the start of an episode. Usually, the initial values can be zero or randomized vectors. The state will be updated based on this initial value. To specify, the user overrides `_get_init_states` in `<flare_root>/flare/framework/agent.py` to return a list of initial states. *This list has to have a one-to-one mapping to the list returned by `get_state_specs`*, although the order could be different and decided by the user.
+
+#### Additional learning and prediction arguments
+After defining the above two functions, now the user can expect to have additional prediction and learning arguments in CT's `predict` and `learn`. Recall that in [Modules](modules.md), we skip the explanations for the states:
+
+* `states`: the states at the current time step
+* `next_states`: the updated states after the current time step; this quantity will be passed to the next time step as `states`
+
+For `predict`, `next_states` is an output; for `learn`, it is provided as an input (computed by `predict` in the past).
+
+The user should expect that both `states` and `next_states` as dictionaries contain the keywords that exactly match the names returned by the model's `get_state_specs`. A state's data format should comply with what has been introduced in [States](#states).
+
+Below is an example model `SimpleRNNModelAC` for an agent with short-term memory:
+```python
+class SimpleRNNModelAC(Model):
+    def __init__(self, dims, num_actions, perception_net):
+        super(SimpleRNNModelAC, self).__init__()
+        assert isinstance(dims, list) or isinstance(dims, tuple)
+        self.dims = dims
+        self.num_actions = num_actions
+        self.hidden_size = list(perception_net.children())[-2].out_features
+        self.hidden_layers = perception_net
+        self.recurrent = nn.RNNCell(
+            input_size=self.hidden_size,
+            hidden_size=self.hidden_size,
+            nonlinearity="relu")
+        self.policy_layers = nn.Sequential(
+            nn.Linear(self.hidden_size, num_actions), nn.Softmax(dim=1))
+        self.value_layer = nn.Linear(self.hidden_size, 1)
+
+    def get_input_specs(self):
+        return [("sensor", dict(shape=self.dims))]
+
+    def get_action_specs(self):
+        return [("action", dict(shape=[1], dtype="int64"))]
+
+    def get_state_specs(self):
+        return [("state", dict(shape=[self.hidden_size]))]
+
+    def policy(self, inputs, states):
+        hidden = self.hidden_layers(inputs.values()[0])
+        next_state = self.recurrent(hidden, states.values()[0])
+        dist = Categorical(probs=self.policy_layers(next_state))
+        return dict(action=dist), dict(state=next_state)
+
+    def value(self, inputs, states):
+        hidden = self.hidden_layers(inputs.values()[0])
+        next_state = self.recurrent(hidden, states.values()[0])
+        return dict(v_value=self.value_layer(next_state)), dict(
+            state=next_state)
+```
+coupled with
+```python
+def _get_init_states(self):
+    return [self._make_zero_states(prop) for _, prop in self.cts_state_specs['RL']]
+```
+in `<flare_root>/flare/agent_zoo/simple_rl_agents.py`.
+
+The majority of `SimpleRNNModelAC` is the same with `SimpleModelAC`. The only difference is a recurrent layer that updates the RNN state.
+
+#### Prediction *vs.* learning regarding sequential data
+For an agent with short-term memory, `predict` always has one level less than `learn` in their sequential input data. The reason is that, `predict` is called at the current time step while `learn` is called on sequences in order for the agent to learn temporal dependencies. Below are two example batches assembled from multiple agents by a [CDP](modules.md).
+
+<p><img src="image/seq_data.png" style="width:40%"></p>
+
+
+As mentioned in [States](#states), for both `predict` and `learn`, a state input doesn't have any sequential information. So both will have the same state format. In the former, a state is from the previous time step; in the latter, a state (sampled from a history buffer) is used as an initial vector to boot the corresponding sequence.

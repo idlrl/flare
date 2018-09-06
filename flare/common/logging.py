@@ -70,6 +70,8 @@ class GameLogger(Process):
             glog.info('\n{0}:{1}'.format(alg_name, stats))
 
     def __save_models(self, idx):
+        ## When agent.learning=False, this will not save models
+        ## because the CTs are blocked by the learning queues
         for signal in self.model_save_signals:
             signal.value = idx
 
@@ -82,6 +84,8 @@ class GameLogger(Process):
             self.__flush_log()
             if self.counter % (self.print_interval * self.model_save_interval
                                ) == 0:
+                ## No matter which pass is loaded, the model will be saved starting
+                ## from pass 1
                 self.__save_models(self.counter / self.print_interval /
                                    self.model_save_interval)
 

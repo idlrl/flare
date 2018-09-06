@@ -7,16 +7,22 @@ import sys
 
 
 class Manager(object):
-    def __init__(self,
-                 ct_settings,
-                 log_settings=dict(
-                     print_interval=100, model_dir="",
-                     model_save_interval=10)):
+    def __init__(self, ct_settings, log_settings=dict()):
         """
             Initialize `Manager`. `ct_settings` is used to create
             `ComputationTask`; The parameters in `ct_settings` are for each
             `ComputationTask`.
         """
+        ## default settings
+        log_settings_ = dict(
+            print_interval=100,
+            model_dir="",
+            pass_num=0,
+            model_save_interval=10)
+        ## update with the user provided ones
+        log_settings_.update(log_settings)
+        log_settings = log_settings_
+
         self.agents = []
         self.logger = GameLogger(
             timeout=1,
@@ -26,6 +32,7 @@ class Manager(object):
         self.CDPs = {}
         for name, setting in ct_settings.iteritems():
             setting["model_dir"] = log_settings["model_dir"]
+            setting["pass_num"] = log_settings["pass_num"]
             self.cts[name] = ComputationTask(name, **setting)
             self.CDPs[name] = self.cts[name].CDP
             self.logger.model_save_signals.append(self.cts[name]
@@ -48,9 +55,9 @@ class Manager(object):
     def add_agent(self, agent):
         agent.id = len(self.agents)
         # `Agent` needs to know the state specs to prepare state data
-        agent.make_initial_states(
+        agent.cts_state_specs = \
             {k: v.get_state_specs()
-             for k, v in self.cts.iteritems()})
+             for k, v in self.cts.iteritems()}
         self.agents.append(agent)
         for name, cdp in self.CDPs.iteritems():
             agent.add_agent_helper(
