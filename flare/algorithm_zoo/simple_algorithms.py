@@ -64,14 +64,14 @@ class SimpleAC(Algorithm):
         cost = self.value_cost_weight * value_cost \
                + pg_cost * td_error.detach() \
                - self.prob_entropy_weight * dist.entropy()  ## increase entropy for exploration
-
-        avg_cost = comf.get_avg_cost(cost)
-        avg_cost.backward(retain_graph=True)
+        sum_of_costs, _ = comf.sum_cost(cost)
+        sum_of_costs.backward(retain_graph=True)
 
         return dict(cost=cost), states_update, next_states_update
 
     def learn(self, inputs, next_inputs, states, next_states, next_alive,
               actions, next_actions, rewards):
+        self.optim.zero_grad()
         if states:
             costs = rc.call_recurrent_group(
                 self._rl_learn, inputs, next_inputs, states, next_states,
@@ -82,9 +82,6 @@ class SimpleAC(Algorithm):
                 next_actions, rewards)
 
         cost = costs["cost"]
-        avg_cost = comf.get_avg_cost(cost)
-        self.optim.zero_grad()
-        avg_cost.backward(retain_graph=True)
 
         if self.grad_clip:
             torch.nn.utils.clip_grad_norm_(self.model.parameters(),

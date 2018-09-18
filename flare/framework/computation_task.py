@@ -22,12 +22,7 @@ class ComputationTask(object):
     c. define a ComputationTask with the algorithm
     """
 
-    def __init__(self,
-                 name,
-                 algorithm,
-                 model_dir="",
-                 pass_num=0,
-                 **kwargs):
+    def __init__(self, name, algorithm, model_dir="", pass_num=0, **kwargs):
         assert isinstance(algorithm, Algorithm)
         self.name = name
         if model_dir == "":

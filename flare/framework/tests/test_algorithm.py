@@ -23,13 +23,13 @@ class TestAlgorithmParas(unittest.TestCase):
         """
 
         alg1 = TestAlgorithm(model=SimpleModelDeterministic(
-            dims=10, mlp=nn.Linear(10, 10)))
+            dims=[10], perception_net=nn.Linear(10, 10)))
         alg2 = TestAlgorithm(model=SimpleModelDeterministic(
-            dims=10, mlp=nn.Linear(10, 10)))
+            dims=[10], perception_net=nn.Linear(10, 10)))
 
         batch_size = 10
         sensor = torch.tensor(
-            np.random.uniform(0, 1, [batch_size, alg1.model.dims]).astype(
+            np.random.uniform(0, 1, [batch_size] + alg1.model.dims).astype(
                 "float32"))
 
         with torch.no_grad():
@@ -61,16 +61,16 @@ class TestAlgorithmParas(unittest.TestCase):
         """
         layer = nn.Linear(10, 10)
         alg1 = TestAlgorithm(model=SimpleModelDeterministic(
-            dims=10, mlp=layer))
+            dims=[10], perception_net=layer))
         alg2 = TestAlgorithm(model=SimpleModelDeterministic(
-            dims=10, mlp=layer))
+            dims=[10], perception_net=layer))
         alg3 = TestAlgorithm(model=SimpleModelDeterministic(
-            dims=10, mlp=nn.Sequential(layer)))
+            dims=[10], perception_net=nn.Sequential(layer)))
         alg4 = deepcopy(alg1)
 
         batch_size = 10
         sensor = torch.tensor(
-            np.random.uniform(0, 1, [batch_size, alg1.model.dims]).astype(
+            np.random.uniform(0, 1, [batch_size] + alg1.model.dims).astype(
                 "float32"))
 
         with torch.no_grad():

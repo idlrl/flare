@@ -96,7 +96,7 @@ class ActionNoiseAgent(SimpleRLAgent):
     def _cts_predict(self, observations, states):
         ## each action is already 2D
         assert len(observations) == 1
-        actions, _ = self.predict('RL', inputs=dict(sensor=observations))
+        actions, _ = self.predict('RL', inputs=dict(sensor=observations[0]))
         a = actions.values()[0][0]
         a = a + self.action_noise.noise()
 

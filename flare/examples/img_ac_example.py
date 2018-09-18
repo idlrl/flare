@@ -46,9 +46,8 @@ if __name__ == '__main__':
         nn.ReLU())
 
     alg = SimpleAC(
-        model=SimpleModelAC(dims=(d, h, w),
-                            num_actions=num_actions,
-                            perception_net=cnn),
+        model=SimpleModelAC(
+            dims=(d, h, w), num_actions=num_actions, perception_net=cnn),
         optim=(optim.RMSprop, dict(lr=1e-4)),
         grad_clip=5.0,
         gpu_id=1)

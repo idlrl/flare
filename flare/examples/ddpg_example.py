@@ -3,7 +3,7 @@ from flare.agent_zoo.simple_rl_agents import ActionNoiseAgent
 from flare.algorithm_zoo.ddpg import ContinuousDeterministicModel, DDPG
 from flare.common.noises import OUNoise
 from flare.framework.agent import ExpReplayHelper
-from flare.framework.env import GymEnv
+from flare.env_zoo.gym_env import GymEnv
 from flare.framework.manager import Manager
 
 if __name__ == '__main__':

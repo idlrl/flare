@@ -72,11 +72,14 @@ class TestComputationTask(unittest.TestCase):
                     action_counter[a[0]] += 1
 
             if max:
-                ### if max, the first action will always be chosen
+                ### if max, some action will always be chosen (which action is
+                ### chosen depends on the network initialization
+                count = 0
                 for i in range(num_actions):
                     prob = action_counter[i] / float(sum(action_counter))
-                    self.assertAlmostEqual(
-                        prob, 1.0 if i == 0 else 0.0, places=1)
+                    if abs(prob - 1.0) < 1e-1:
+                        count = count + 1
+                self.assertEqual(count, 1)
             else:
                 ### the actions should be uniform
                 for i in range(num_actions):
