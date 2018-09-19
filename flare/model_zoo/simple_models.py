@@ -1,5 +1,5 @@
+from flare.common.distributions import Deterministic
 from flare.framework.algorithm import Model
-from flare.framework.distributions import Deterministic
 from flare.framework import common_functions as comf
 import torch
 import torch.nn as nn

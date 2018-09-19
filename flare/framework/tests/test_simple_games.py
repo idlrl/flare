@@ -48,13 +48,15 @@ class TestGymGame(unittest.TestCase):
 
         games = ["MountainCar-v0", "CartPole-v0", "Pendulum-v0"]
         final_rewards_thresholds = [
-            -1.5,  ## drive to the right top in 150 steps (timeout is -2.0)
-            1.5,  ## hold the pole for at least 150 steps
-            -3.0  ## can swing the stick to the top most of the times
+            -1.50,  ## drive to the right top in 150 steps (timeout is -2.0)
+            1.50,  ## hold the pole for at least 150 steps
+            -3.00  ## can swing the stick to the top most of the times
         ]
         on_policies = [False, True, False]
         discrete_actions = [True, True, False]
 
+        print zip(games, final_rewards_thresholds, on_policies,
+                  discrete_actions)
         for game, threshold, on_policy, discrete_action in \
             zip(games, final_rewards_thresholds, on_policies, discrete_actions):
 
@@ -74,9 +76,9 @@ class TestGymGame(unittest.TestCase):
                 nn.ReLU(), nn.Linear(hidden_size, hidden_size), nn.ReLU())
 
             q_model = SimpleModelQ(
-                dims=state_shape,
+                dims=[state_shape],
                 num_actions=num_actions,
-                mlp=nn.Sequential(mlp, nn.Linear(hidden_size, num_actions)))
+                perception_net=mlp)
 
             if on_policy:
                 alg = SimpleSARSA(model=q_model, epsilon=0.1)
@@ -96,15 +98,15 @@ class TestGymGame(unittest.TestCase):
                 else:
                     alg = OffPolicyAC(
                         model=GaussianPolicyModel(
-                            dims=state_shape,
+                            dims=[state_shape],
                             action_dims=num_actions,
-                            mlp=mlp,
+                            perception_net=mlp,
                             std=1.0),
                         epsilon=0.2)
 
             glog.info("algorithm: " + alg.__class__.__name__)
 
-            ct = ComputationTask("RL", algorithm=alg, hyperparas=dict(lr=1e-4))
+            ct = ComputationTask("RL", algorithm=alg)
             batch_size = 32
             if not on_policy:
                 train_every_steps = batch_size / 4

@@ -75,3 +75,33 @@ class SimpleRNNRLAgent(Agent):
             inputs=dict(sensor=observations[0]),
             states=dict(state=states[0]))
         return [actions["action"]], next_states.values()
+
+
+class ActionNoiseAgent(SimpleRLAgent):
+    """
+    This class extends `SimpleRLAgent` by applying action noise after 
+    prediction. It can be used to algorithms with deterministic policies, e.g.,
+    `DDPG`.
+    """
+
+    def __init__(self,
+                 env,
+                 num_games,
+                 action_noise,
+                 reward_shaping_f=lambda x: x):
+        super(ActionNoiseAgent, self).__init__(env, num_games,
+                                               reward_shaping_f)
+        self.action_noise = action_noise
+
+    def _cts_predict(self, observations, states):
+        ## each action is already 2D
+        assert len(observations) == 1
+        actions, _ = self.predict('RL', inputs=dict(sensor=observations[0]))
+        a = actions.values()[0][0]
+        a = a + self.action_noise.noise()
+
+        return [a], []
+
+    def _reset_env(self):
+        self.action_noise.reset()
+        return super(ActionNoiseAgent, self)._reset_env()

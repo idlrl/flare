@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch.optim as optim
 import numpy as np
 from flare.algorithm_zoo.simple_algorithms import SimpleAC
 from flare.model_zoo.simple_models import SimpleModelAC
@@ -47,6 +48,8 @@ if __name__ == '__main__':
     alg = SimpleAC(
         model=SimpleModelAC(
             dims=(d, h, w), num_actions=num_actions, perception_net=cnn),
+        optim=(optim.RMSprop, dict(lr=1e-4)),
+        grad_clip=5.0,
         gpu_id=1)
 
     # 3. Specify the settings for learning: data sampling strategy
@@ -55,7 +58,6 @@ if __name__ == '__main__':
     ct_settings = {
         "RL": dict(
             algorithm=alg,
-            hyperparas=dict(grad_clip=5.0),
             # sampling
             agent_helper=OnlineHelper,
             # each agent will call `learn()` every `sample_interval` steps

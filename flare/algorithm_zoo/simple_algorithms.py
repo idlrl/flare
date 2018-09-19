@@ -2,8 +2,10 @@ from copy import deepcopy
 import numpy as np
 from torch.distributions import Categorical
 import torch
+import torch.optim as optim
 from flare.framework.algorithm import Algorithm
 from flare.framework import common_functions as comf
+import flare.framework.recurrent as rc
 
 
 class SimpleAC(Algorithm):
@@ -19,16 +21,19 @@ class SimpleAC(Algorithm):
                  gpu_id=-1,
                  discount_factor=0.99,
                  value_cost_weight=0.5,
-                 prob_entropy_weight=0.01):
+                 prob_entropy_weight=0.01,
+                 optim=(optim.RMSprop, dict(lr=1e-4)),
+                 grad_clip=None):
 
         super(SimpleAC, self).__init__(model, gpu_id)
         self.discount_factor = discount_factor
         self.value_cost_weight = value_cost_weight
         self.prob_entropy_weight = prob_entropy_weight
+        self.optim = optim[0](self.model.parameters(), **optim[1])
+        self.grad_clip = grad_clip
 
-    def learn(self, inputs, next_inputs, states, next_states, next_alive,
-              actions, next_actions, rewards):
-
+    def _rl_learn(self, inputs, next_inputs, states, next_states, next_alive,
+                  actions, next_actions, rewards):
         action = actions["action"]
         reward = rewards["reward"]
 
@@ -59,10 +64,31 @@ class SimpleAC(Algorithm):
         cost = self.value_cost_weight * value_cost \
                + pg_cost * td_error.detach() \
                - self.prob_entropy_weight * dist.entropy()  ## increase entropy for exploration
+        sum_of_costs, _ = comf.sum_cost(cost)
+        sum_of_costs.backward(retain_graph=True)
 
-        avg_cost = comf.get_avg_cost(cost)
-        avg_cost.backward(retain_graph=True)
         return dict(cost=cost), states_update, next_states_update
+
+    def learn(self, inputs, next_inputs, states, next_states, next_alive,
+              actions, next_actions, rewards):
+        self.optim.zero_grad()
+        if states:
+            costs = rc.call_recurrent_group(
+                self._rl_learn, inputs, next_inputs, states, next_states,
+                next_alive, actions, next_actions, rewards)
+        else:
+            costs, states_update, next_states_update = self._rl_learn(
+                inputs, next_inputs, states, next_states, next_alive, actions,
+                next_actions, rewards)
+
+        cost = costs["cost"]
+
+        if self.grad_clip:
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(),
+                                           self.grad_clip)
+        self.optim.step()
+
+        return dict(cost=cost)
 
     def predict(self, inputs, states):
         return self._rl_predict(self.model, inputs, states)
@@ -81,7 +107,9 @@ class SimpleQ(Algorithm):
                  discount_factor=0.99,
                  exploration_end_steps=0,
                  exploration_end_rate=0.1,
-                 update_ref_interval=100):
+                 update_ref_interval=100,
+                 optim=(optim.RMSprop, dict(lr=1e-4)),
+                 grad_clip=None):
 
         super(SimpleQ, self).__init__(model, gpu_id)
         self.discount_factor = discount_factor
@@ -101,6 +129,8 @@ class SimpleQ(Algorithm):
                 = (1 - exploration_end_rate) / exploration_end_steps
         else:
             self.exploration_rate = 0.0
+        self.optim = optim[0](self.model.parameters(), **optim[1])
+        self.grad_clip = grad_clip
 
     def predict(self, inputs, states):
         """
@@ -153,13 +183,24 @@ class SimpleQ(Algorithm):
         cost = (critic_value - value)**2
 
         avg_cost = comf.get_avg_cost(cost)
+        self.optim.zero_grad()
         avg_cost.backward(retain_graph=True)
+        if self.grad_clip:
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(),
+                                           self.grad_clip)
+        self.optim.step()
 
-        return dict(cost=cost), states_update, next_states_update
+        return dict(cost=cost)
 
 
 class SimpleSARSA(SimpleQ):
-    def __init__(self, model, gpu_id=-1, discount_factor=0.99, epsilon=0.1):
+    def __init__(self,
+                 model,
+                 gpu_id=-1,
+                 discount_factor=0.99,
+                 epsilon=0.1,
+                 optim=(optim.RMSprop, dict(lr=1e-4)),
+                 grad_clip=None):
 
         super(SimpleSARSA, self).__init__(
             model=model,
@@ -167,7 +208,9 @@ class SimpleSARSA(SimpleQ):
             discount_factor=discount_factor,
             exploration_end_steps=1,
             exploration_end_rate=epsilon,
-            update_ref_interval=0)
+            update_ref_interval=0,
+            optim=optim,
+            grad_clip=grad_clip)
 
     def learn(self, inputs, next_inputs, states, next_states, next_alive,
               actions, next_actions, rewards):
@@ -189,9 +232,14 @@ class SimpleSARSA(SimpleQ):
         cost = (critic_value - comf.idx_select(q_value, action))**2
 
         avg_cost = comf.get_avg_cost(cost)
+        self.optim.zero_grad()
         avg_cost.backward(retain_graph=True)
+        if self.grad_clip:
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(),
+                                           self.grad_clip)
+        self.optim.step()
 
-        return dict(cost=cost), states_update, next_states_update
+        return dict(cost=cost)
 
 
 class OffPolicyAC(Algorithm):
@@ -207,12 +255,16 @@ class OffPolicyAC(Algorithm):
                  epsilon=0.1,
                  gpu_id=-1,
                  discount_factor=0.99,
-                 value_cost_weight=1.0):
+                 value_cost_weight=1.0,
+                 optim=(optim.RMSprop, dict(lr=1e-4)),
+                 grad_clip=None):
 
         super(OffPolicyAC, self).__init__(model, gpu_id)
         self.epsilon = epsilon
         self.discount_factor = discount_factor
         self.value_cost_weight = value_cost_weight
+        self.optim = optim[0](self.model.parameters(), **optim[1])
+        self.grad_clip = grad_clip
 
     def get_action_specs(self):
         ### "action_log_prob" is required by the algorithm but not by the model
@@ -264,9 +316,14 @@ class OffPolicyAC(Algorithm):
         cost = self.value_cost_weight * value_cost - pg_obj
 
         avg_cost = comf.get_avg_cost(cost)
+        self.optim.zero_grad()
         avg_cost.backward(retain_graph=True)
+        if self.grad_clip:
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(),
+                                           self.grad_clip)
+        self.optim.step()
 
-        return dict(cost=cost), states_update, next_states_update
+        return dict(cost=cost)
 
     def predict(self, inputs, states):
         return self._rl_predict(self.model, inputs, states)
