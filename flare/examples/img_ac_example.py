@@ -15,19 +15,31 @@ if __name__ == '__main__':
     """
     game = "Assault-v0"
 
-    num_agents = 16
+    num_agents = 1
     num_games = 8000
 
-    # 1. Create image environments
     im_height, im_width = 84, 84
-    envs = []
+    env_class = GymEnvImage
+    env_args = dict(
+        game_name=game,
+        contexts=4,
+        height=im_height,
+        width=im_width,
+        gray=True)
+
+    env = env_class(**env_args)
+    d, h, w = env.observation_dims()["sensor"]
+    num_actions = env.action_dims()["action"]
+
+    # 1. Spawn one agent for each instance of environment.
+    #    Agent's behavior depends on the actual algorithm being used. Since we
+    #    are using SimpleAC, a proper type of Agent is SimpleRLAgent.
+    agents = []
     for _ in range(num_agents):
-        envs.append(
-            GymEnvImage(
-                game, contexts=4, height=im_height, width=im_width, gray=True))
-    # context screens
-    d, h, w = envs[-1].observation_dims()[0]
-    num_actions = envs[-1].action_dims()[0]
+        agent = SimpleRLAgent(
+            num_games, reward_shaping_f=np.sign)  # ignore reward magnitude
+        agent.set_env(env_class, **env_args)
+        agents.append(agent)
 
     # 2. Construct the network and specify the algorithm.
     #    Here we use a small CNN as the perception net for the Actor-Critic algorithm
@@ -67,14 +79,5 @@ if __name__ == '__main__':
 
     # 4. Create Manager that handles the running of the whole pipeline
     manager = Manager(ct_settings)
-
-    # 5. Spawn one agent for each instance of environment.
-    #    Agent's behavior depends on the actual algorithm being used. Since we
-    #    are using SimpleAC, a proper type of Agent is SimpleRLAgent.
-    for env in envs:
-        agent = SimpleRLAgent(env, num_games, reward_shaping_f=np.sign)
-        # An Agent has to be added into the Manager before we can use it to
-        # interact with environment and collect data
-        manager.add_agent(agent)
-
+    manager.add_agents(agents)
     manager.start()

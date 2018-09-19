@@ -1,7 +1,9 @@
+from collections import Iterable
 import torch
 import torch.nn as nn
 from torch.distributions import Categorical
 import operator
+import flare.framework.recurrent as rc
 
 
 def q_categorical(q_value):
@@ -51,16 +53,24 @@ def one_hot(idx, depth):
 
 
 def get_avg_cost(costs):
-    cost_total, weight_total = sum_cost(costs)
+    cost_total, weight_total = sum_cost_tensor(costs)
     avg_cost = cost_total / weight_total
     return avg_cost
 
 
-def sum_cost(costs):
+def sum_cost_array(costs):
+    if isinstance(costs, Iterable):
+        costs, ns = zip(*map(sum_cost_array, costs))
+        return sum(costs), sum(ns)
+    else:
+        return costs, 1
+
+
+def sum_cost_tensor(costs):
     if isinstance(costs, torch.Tensor):
         return (costs.view(-1).sum(), reduce(operator.mul, costs.size()))
     assert isinstance(costs, list)
-    costs, ns = zip(*map(sum_cost, costs))
+    costs, ns = zip(*map(sum_cost_tensor, costs))
     return sum(costs), sum(ns)
 
 
@@ -68,3 +78,81 @@ class Flatten(nn.Module):
     def forward(self, x):
         x = x.view(x.size()[0], -1)
         return x
+
+
+class BoW(nn.Module):
+    """
+    Convert a sentence to a compact BoW embedding.
+    If one_more_hidden is True, then we add another hidden layer
+    after the BoW embedding.
+
+    dict_size: the vocabulary size
+    dim:       the embedding/hidden size
+    """
+
+    def __init__(self, dict_size, dim, std=None, one_more_hidden=True):
+        super(BoW, self).__init__()
+        self.dim = dim
+        self.embedding_table = nn.Embedding(dict_size, dim)
+        if std is not None:
+            assert std > 0
+            self.embedding_table.weight.data.normal_(0, std)
+        self.one_more_hidden = one_more_hidden
+        self.hidden = nn.Sequential(nn.Linear(dim, dim), nn.ReLU())
+
+    def forward(self, sentence):
+        def embedding(word):
+            return [self.embedding_table(word.squeeze(-1))], []
+
+        embeddings, = rc.recurrent_group(
+            seq_inputs=[sentence], step_func=embedding)
+        bow = sequence_pooling(embeddings, pooling_type="sum")
+        if self.one_more_hidden:
+            return self.hidden(bow)
+        return bow
+
+
+def sequence_pooling(seq, pooling_type="average"):
+    assert isinstance(seq, list), "seq must be a list!"
+    for inst in seq:
+        assert isinstance(inst, torch.Tensor), "seq must be the lowest level"
+    if pooling_type == "average":
+        f = torch.mean
+    elif pooling_type == "sum":
+        f = torch.sum
+    else:
+        assert False, "Incorrect pooling_type!"
+    return torch.stack([f(inst, dim=0) for inst in seq])
+
+
+def sequence_last(seq):
+    assert isinstance(seq, list), "seq must be a list!"
+    for inst in seq:
+        assert isinstance(inst, torch.Tensor), "seq must be the lowest level"
+    return torch.stack([inst[-1] for inst in seq])
+
+
+def prepare_ntd_reward(reward, discount_factor):
+    assert isinstance(reward, list)
+    ntd_reward = []
+    for r_ in reward:
+        assert isinstance(r_, torch.Tensor)
+        r = r_.clone()
+        assert len(r.size()) == 2, "r should be a 2d tensor!"
+        for i in range(r.size()[0] - 2, -1, -1):
+            r[i] += discount_factor * r[i + 1]
+        ntd_reward.append(r)
+    return ntd_reward
+
+
+def prepare_ntd_value(value, discount_factor):
+    assert isinstance(value, list)
+    ntd_value = []
+    for v_ in value:
+        assert isinstance(v_, torch.Tensor)
+        v = v_.clone()
+        assert len(v.size()) == 2, "v should be a 2d tensor!"
+        for i in range(v.size()[0] - 2, -1, -1):
+            v[i] = discount_factor * v[i + 1]
+        ntd_value.append(v)
+    return ntd_value

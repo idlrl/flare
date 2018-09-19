@@ -61,7 +61,7 @@ class SimpleModelDeterministic(Model):
         return [("sensor", dict(shape=self.dims))]
 
     def get_action_specs(self):
-        return [("continuous_action", dict(shape=self.dims))]
+        return [("action", dict(shape=self.dims))]
 
     def policy(self, inputs, states):
         """
@@ -69,9 +69,9 @@ class SimpleModelDeterministic(Model):
         """
         # we have the "sensor" keyword in self.get_input_specs
         hidden = self.perception_net(inputs["sensor"])
-        # we must return the action keyword "continuous_action" since it is defined
+        # we must return the action keyword "action" since it is defined
         # in self.get_action_specs
-        return dict(continuous_action=Deterministic(hidden)), states
+        return dict(action=Deterministic(hidden)), states
 ```
 
 ## Algorithm <a name="algorithm"/>
@@ -86,7 +86,7 @@ def predict(self, inputs, states):
     """
     Given the inputs and states, this function does forward prediction and updates states.
     Input: inputs(dict), states(dict)
-    Output: actions(dict), states(dict)
+    Output: actions(dict), updated_states(dict)
 
     Optional: an algorithm might not implement predict()
     """
@@ -95,15 +95,15 @@ def predict(self, inputs, states):
 def learn(self, inputs, next_inputs, states, next_states, next_alive,
           actions, next_actions, rewards):
     """
-    This function computes a learning cost to be optimized.
-    The return should be the cost and updated states.
-    Output: cost(dict), states(dict)
+    This function computes learning costs to be optimized.
+    The return should be the costs
+    Output: cost(dict)
 
     Optional: an algorithm might not implement learn()
     """
     pass
 ```
-The `predict()` function decides which functions of the model to be called to generate actions. This typically only involves the forward process of the network. The `learn()` function decides which functions of the model to be called to learn network parameters. This typically involves both the forward and backward processes.
+The `predict()` function decides which functions of the model to be called to generate actions. This typically only involves the forward process of the network. The `learn()` function decides which functions of the model to be called to learn network parameters. This typically involves both the forward and backward processes. It could also manipulate the gradients (e.g., clipping) before performing update steps of the optimizer.
 
 For the meanings of the arguments of `predict()` and `learn()`, please see the next section [Computation Task](#ct).
 
@@ -129,7 +129,7 @@ class TestAlgorithm(Algorithm):
         cost = (inputs.values()[0] - actions.values()[0]) ** 2
         avg_cost = cost.view(-1).mean()
         avg_cost.backward()
-        return dict(cost=avg_cost), states, next_states
+        return dict(cost=avg_cost)
 ```
 
 ## Computation Task <a name="ct"/>
@@ -201,27 +201,44 @@ An `Agent` implements the high-level logic of how to interact with the environme
 We have already provided an implementation of `_run_one_episode()` in `<flare_root>/flare/framework/agent.py`.
 ```python
 def _run_one_episode(self):
+    def __store_data(observations, actions, states, rewards):
+        learning_ret = self._cts_store_data(
+            observations, actions, states, rewards)  ## written by user
+        if learning_ret is not None:
+            for k, v in learning_ret.iteritems():
+                self.log_entry.add_key(k, v)
+
     observations = self._reset_env()
     states = self._get_init_states()  ## written by user
 
-    while self.alive and (not self._game_timeout()):
+    while self.alive and (not self.env.time_out()):
         actions, next_states = self._cts_predict(
             observations, states)  ## written by user
-        assert isinstance(actions, list)
-        assert isinstance(next_states, list)
+        assert isinstance(actions, dict)
+        assert isinstance(next_states, dict)
         next_observations, rewards, next_game_over = self._step_env(
             actions)
-        self._cts_store_data(observations, actions, states,
-                             rewards)  ## written by user
+        __store_data(observations, actions, states, rewards)
+
         observations = next_observations
         states = next_states
-        self.alive = 1 - int(next_game_over)
+        ## next_game_over == 1:  success
+        ## next_game_over == -1: failure
+        self.alive = 1 - abs(next_game_over)
 
-    actions, _ = self._cts_predict(observations, states)
-    if self._game_timeout():
+    ## self.alive:  0  -- success/failure
+    ##              1  -- normal
+    ##             -1  -- timeout
+    if self.env.time_out():
         self.alive = -1
-    self._cts_store_data(observations, actions, states, [0] * len(rewards))
+    actions, _ = self._cts_predict(observations, states)
+    zero_rewards = {k: [0] * len(v) for k, v in rewards.iteritems()}
+    __store_data(observations, actions, states, zero_rewards)
 
+    ## Record success. For games that do not have a defintion of
+    ## 'success' (e.g., 'breakout' never ends), this quantity will
+    ## always be zero
+    self.log_entry.add_key("success", next_game_over > 0)
     return self._total_reward()
 ```
 
@@ -240,26 +257,37 @@ class SimpleRLAgent(Agent):
     policy or off-policy RL algorithms.
     """
 
-    def __init__(self, env, num_games, reward_shaping_f=lambda x: x):
-        super(SimpleRLAgent, self).__init__(env, num_games)
+    def __init__(self,
+                 num_games,
+                 actrep=1,
+                 learning=True,
+                 reward_shaping_f=lambda x: x):
+        super(SimpleRLAgent, self).__init__(num_games, actrep, learning)
         self.reward_shaping_f = reward_shaping_f
 
     def _cts_store_data(self, observations, actions, states, rewards):
-        assert len(observations) == 1 and len(actions) == 1
-        self._store_data(
-            'RL',
-            dict(
-                sensor=observations[0],
-                action=actions[0],
-                reward=[self.reward_shaping_f(r) for r in rewards]))
+        ## before storing rewards for training, we reshape them
+        for k in rewards.keys():
+            ## each r is a reward vector
+            rewards[k] = [self.reward_shaping_f(r) for r in rewards[k]]
+        ## store everything in the buffer
+        data = {}
+        data.update(observations)
+        data.update(actions)
+        data.update(states)
+        data.update(rewards)
+        ret = self._store_data('RL', data)
+        if ret is not None:
+            ## If not None, _store_data calls learn() in this iteration
+            ## We return the cost for logging
+            cost, learn_info = ret
+            return {k: comf.sum_cost_array(v)[0] for k, v in cost.iteritems()}
 
     def _cts_predict(self, observations, states):
-        assert len(observations) == 1
-        actions, _ = self.predict('RL', inputs=dict(sensor=observations[0]))
-        return [actions["action"]], []
+        return self.predict('RL', observations, states)
 ```
 
-The agent stores and predicts data at the current time step. For either storing or prediction, the data will be wrapped as a dictionary whose keys should match the keywords specified in the defined `Model` specs. Whenever the agent calls `self._store_data` or `self.predict`, it does not actually perform the computation but only puts data in the queues of CDPs. These queues can also be shared by another agent. The CDPs have their own prediction and training loops that will take out the data from the queues, perform the computations, and return the results to agents.
+The agent predicts and stores data at the current time step. Whenever the agent calls `self._store_data` or `self.predict`, it does not actually perform the computation but only puts data in the queues of CDPs. These queues can also be shared by another agent. The CDPs have their own prediction and training loops that will take out the data from the queues, perform the computations, and return the results to agents.
 
 ## Agent Helper <a name="ah"/>
 Each `Agent` has a set of `AgentHelper`s. The number of the helpers is equal to the number of CTs (CDPs), with each helper corresponding to a CT. When the agent calls `self._store_data` or `self.predict`, it has to provide the name of the CT and then the corresponding helper actually calls its own `predict` and `_store_data`:
@@ -279,13 +307,14 @@ def predict(self, alg_name, inputs, states=dict()):
     return prediction, next_states
 
 def _store_data(self, alg_name, data):
-    self.helpers[alg_name]._store_data(self.alive, data)
+    if self.learning: ## only store when the agent is learning
+        self.helpers[alg_name]._store_data(self.alive, data)
 ```
 A helper's responsibility is to manage data collection for its associated CT. As mentioned in [Computation Task](#ct), a CT might have its own data buffer and sampling schedule. Currently we support two kinds of `AgentHelper`:
 * `OnlineHelper`: This helper stores a small number of the most recent experiences. When sampling, it takes out all the experiences in the buffer for training. This helper is usually used by on-policy algorithms such as Actor-Critic and SARSA. Some off-policy algorithms such as [PPO2](https://blog.openai.com/openai-baselines-ppo/) also uses it.
 * `ExpReplayhelper`: This helper stores a huge number of experiences in a replay buffer. When sampling, it takes a small portion of the entire buffer for training. The sampling strategy could be uniform or [prioritized](https://arxiv.org/abs/1511.05952). Because the buffer is huge, almost all experiences were generated by outdated policies. Thus this helper can only be used by off-policy algorithms such as Q-learning and Off-policy AC.
 
-Eventually we will have an `AgentHelper` matrix for a training setup. An example of 3 agents and 2 CTs is illustrated below:
+Essentially we will have an `AgentHelper` matrix for a training setup. An example of 3 agents and 2 CTs is illustrated below:
 
 <p><img src="image/agent_helpers.jpg" style="width:70%"></p>
 

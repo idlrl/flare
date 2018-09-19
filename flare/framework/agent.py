@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from multiprocessing import Process, Value
 import numpy as np
-from flare.common.logging import GameLogEntry
+from flare.common.log import GameLogEntry
 from flare.common.communicator import AgentCommunicator
 from flare.common.replay_buffer import NoReplacementQueue, ReplayBuffer, Experience
 
@@ -34,7 +34,6 @@ class AgentHelper(object):
             assert seq
             return [e.val(k) for e in seq]
 
-        size = sum([len(exp_seq) - 1 for exp_seq in exp_seqs])
         ret = dict(
             inputs={},
             next_inputs={},
@@ -64,7 +63,7 @@ class AgentHelper(object):
             ret["next_states"] = dict()
 
         for k in self.state_keys:
-            ## we only take the first/second element of a seq
+            ## we only take the first(second) element of a seq for states(next_states)
             ret["states"][
                 k] = [extract_key(exp_seq[:1], k)[0] for exp_seq in exp_seqs]
             ret["next_states"][k] = [
@@ -80,7 +79,7 @@ class AgentHelper(object):
                     for kk in ret[k].keys():
                         ret[k][kk] = concat_lists(ret[k][kk])
 
-        return ret, size
+        return ret, len(exp_seqs)
 
     def predict(self, inputs, states=dict()):
         """
@@ -118,7 +117,7 @@ class AgentHelper(object):
         self.add_experience(t)
         self.counter += 1
         if self.counter % self.sample_interval == 0:
-            self.learn()
+            return self.learn()
 
     @abstractmethod
     def sample_experiences(self):
@@ -145,6 +144,7 @@ class AgentHelper(object):
         data, size = self.unpack_exps(exp_seqs)
         self.comm.put_training_data(data, size)
         ret = self.comm.get_training_return()
+        return ret
 
 
 class OnlineHelper(AgentHelper):
@@ -219,10 +219,9 @@ class Agent(Process):
     """
     __metaclass__ = ABCMeta
 
-    def __init__(self, env, num_games, learning):
+    def __init__(self, num_games, actrep, learning):
         super(Agent, self).__init__()
         self.id = -1  # just created, not added to the Robot yet
-        self.env = env
         self.num_games = num_games
         self.learning = learning
         self.state_specs = None
@@ -231,6 +230,19 @@ class Agent(Process):
         self.running = Value('i', 0)
         self.daemon = True  ## Process member
         self.alive = 1
+        self.env_f = None
+        self.actrep = actrep
+
+    def set_env(self, env_class, *args, **kwargs):
+        """
+        Set the environment for the agent. For now, only create a lambda
+        function. Once the agent process starts running, we will call this
+        function.
+
+        env_class:    The environment class to create
+        args, kwargs: The arguments for creating the class
+        """
+        self.env_f = lambda: env_class(*args, **kwargs)
 
     def add_agent_helper(self, helper, input_keys, action_keys, state_keys,
                          reward_keys):
@@ -271,6 +283,10 @@ class Agent(Process):
         """
         Default entry function of Agent process.
         """
+        assert self.env_f is not None, "You should first call self.set_env()!"
+        ## Only call the env function now to make sure there is only one
+        ## environment (OpenGL context) in each process
+        self.env = self.env_f()
         self.running.value = 1
         for i in range(self.num_games):
             self._run_one_episode()
@@ -279,31 +295,48 @@ class Agent(Process):
         self.running.value = 0
 
     def _store_data(self, alg_name, data):
-        if self.learning:
-            self.helpers[alg_name]._store_data(self.alive, data)
+        if self.learning:  ## only store when the agent is learning
+            return self.helpers[alg_name]._store_data(self.alive, data)
 
     def _run_one_episode(self):
+        def __store_data(observations, actions, states, rewards):
+            learning_ret = self._cts_store_data(observations, actions, states,
+                                                rewards)  ## written by user
+            if learning_ret is not None:
+                for k, v in learning_ret.iteritems():
+                    self.log_entry.add_key(k, v)
+
         observations = self._reset_env()
         states = self._get_init_states()  ## written by user
 
         while self.alive and (not self.env.time_out()):
             actions, next_states = self._cts_predict(
                 observations, states)  ## written by user
-            assert isinstance(actions, list)
-            assert isinstance(next_states, list)
+            assert isinstance(actions, dict)
+            assert isinstance(next_states, dict)
             next_observations, rewards, next_game_over = self._step_env(
                 actions)
-            self._cts_store_data(observations, actions, states,
-                                 rewards)  ## written by user
+            __store_data(observations, actions, states, rewards)
+
             observations = next_observations
             states = next_states
-            self.alive = 1 - int(next_game_over)
+            ## next_game_over == 1:  success
+            ## next_game_over == -1: failure
+            self.alive = 1 - abs(next_game_over)
 
-        actions, _ = self._cts_predict(observations, states)
+        ## self.alive:  0  -- success/failure
+        ##              1  -- normal
+        ##             -1  -- timeout
         if self.env.time_out():
             self.alive = -1
-        self._cts_store_data(observations, actions, states, [0] * len(rewards))
+        actions, _ = self._cts_predict(observations, states)
+        zero_rewards = {k: [0] * len(v) for k, v in rewards.iteritems()}
+        __store_data(observations, actions, states, zero_rewards)
 
+        ## Record success. For games that do not have a defintion of
+        ## 'success' (e.g., 'breakout' never ends), this quantity will
+        ## always be zero
+        self.log_entry.add_key("success", next_game_over > 0)
         return self._total_reward()
 
     def _reset_env(self):
@@ -311,15 +344,16 @@ class Agent(Process):
         ## currently we only support a single logger for all CTs
         self.log_entry = GameLogEntry(self.id, 'All')
         obs = self.env.reset()
-        assert isinstance(obs, list)
+        assert isinstance(obs, dict)
         return obs
 
     def _step_env(self, actions):
-        next_observations, rewards, next_game_over = self.env.step(actions)
-        assert isinstance(next_observations, list)
-        assert isinstance(rewards, list)
-        self.log_entry.num_steps += 1
-        self.log_entry.total_reward += sum(rewards)
+        next_observations, rewards, next_game_over = self.env.step(actions,
+                                                                   self.actrep)
+        assert isinstance(next_observations, dict)
+        assert isinstance(rewards, dict)
+        self.log_entry.add_key("num_steps", 1)
+        self.log_entry.add_key("total_reward", sum(map(sum, rewards.values())))
         return next_observations, rewards, next_game_over
 
     def _total_reward(self):
@@ -329,9 +363,9 @@ class Agent(Process):
     def _get_init_states(self):
         """
         By default, there is no state. The user needs to override this function
-        to return a list of init states if necessary.
+        to return a dictionary of init states if necessary.
         """
-        return []
+        return dict()
 
     @abstractmethod
     def _cts_predict(self, observations, states):
@@ -339,10 +373,10 @@ class Agent(Process):
         The user needs to override this function to specify how different CTs
         make predictions given observations and states.
 
-        Output: actions:           a list of actions, each action being a vector
+        Output: actions:           a dictionary of actions, each action being a vector
                                    If the action is discrete, then it is a length-one
                                    list of an integer.
-                states (optional): a list of states, each state being a floating vector
+                states (optional): a dictionary of states, each state being a floating vector
         """
         pass
 
@@ -351,5 +385,6 @@ class Agent(Process):
         """
         The user needs to override this function to specify how different CTs
         store their corresponding experiences, by calling self._store_data().
+        Each input should be a dictionary.
         """
         pass

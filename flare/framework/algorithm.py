@@ -129,7 +129,7 @@ class Algorithm(object):
         """
         Given the inputs and states, this function does forward prediction and updates states.
         Input: inputs(dict), states(dict)
-        Output: actions(dict), states(dict)
+        Output: actions(dict), updated_states(dict)
 
         Optional: an algorithm might not implement predict()
         """
@@ -157,9 +157,9 @@ class Algorithm(object):
     def learn(self, inputs, next_inputs, states, next_states, next_alive,
               actions, next_actions, rewards):
         """
-        This function computes a learning cost to be optimized.
-        The return should be the cost and updated states.
-        Output: cost(dict), states(dict)
+        This function computes learning costs to be optimized.
+        The return should be the costs
+        Output: cost(dict)
 
         Optional: an algorithm might not implement learn()
         """

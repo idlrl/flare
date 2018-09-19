@@ -1,5 +1,6 @@
 import numpy as np
 from flare.framework.agent import Agent
+from flare.framework import common_functions as comf
 
 
 class SimpleRLAgent(Agent):
@@ -12,29 +13,36 @@ class SimpleRLAgent(Agent):
     """
 
     def __init__(self,
-                 env,
                  num_games,
+                 actrep=1,
                  learning=True,
                  reward_shaping_f=lambda x: x):
-        super(SimpleRLAgent, self).__init__(env, num_games, learning)
+        super(SimpleRLAgent, self).__init__(num_games, actrep, learning)
         self.reward_shaping_f = reward_shaping_f
 
     def _cts_store_data(self, observations, actions, states, rewards):
-        assert len(observations) == 1 and len(actions) == 1
-        self._store_data(
-            'RL',
-            dict(
-                sensor=observations[0],
-                action=actions[0],
-                reward=[self.reward_shaping_f(r) for r in rewards]))
+        ## before storing rewards for training, we reshape them
+        for k in rewards.keys():
+            ## each r is a reward vector
+            rewards[k] = [self.reward_shaping_f(r) for r in rewards[k]]
+        ## store everything in the buffer
+        data = {}
+        data.update(observations)
+        data.update(actions)
+        data.update(states)
+        data.update(rewards)
+        ret = self._store_data('RL', data)
+        if ret is not None:
+            ## If not None, _store_data calls learn() in this iteration
+            ## We return the cost for logging
+            cost, learn_info = ret
+            return {k: comf.sum_cost_array(v)[0] for k, v in cost.iteritems()}
 
     def _cts_predict(self, observations, states):
-        assert len(observations) == 1
-        actions, _ = self.predict('RL', inputs=dict(sensor=observations[0]))
-        return [actions["action"]], []
+        return self.predict('RL', observations, states)
 
 
-class SimpleRNNRLAgent(Agent):
+class SimpleRNNRLAgent(SimpleRLAgent):
     """
     This class serves as an example of simple RL algorithms with a single RNN state,
     which has only one ComputationTask, "RL", i.e., using and learning an RL policy.
@@ -44,64 +52,13 @@ class SimpleRNNRLAgent(Agent):
     """
 
     def __init__(self,
-                 env,
                  num_games,
+                 actrep=1,
                  learning=True,
                  reward_shaping_f=lambda x: x):
-        super(SimpleRNNRLAgent, self).__init__(env, num_games, learning)
-        self.reward_shaping_f = reward_shaping_f
+        super(SimpleRNNRLAgent, self).__init__(num_games, actrep, learning,
+                                               reward_shaping_f)
 
     def _get_init_states(self):
-        return [
-            self._make_zero_states(prop)
-            for _, prop in self.cts_state_specs['RL']
-        ]
-
-    def _cts_store_data(self, observations, actions, states, rewards):
-        assert len(observations) == 1 and len(actions) == 1
-        assert len(states) == 1
-        self._store_data(
-            'RL',
-            dict(
-                sensor=observations[0],
-                action=actions[0],
-                state=states[0],
-                reward=[self.reward_shaping_f(r) for r in rewards]))
-
-    def _cts_predict(self, observations, states):
-        assert len(observations) == 1 and len(states) == 1
-        actions, next_states = self.predict(
-            'RL',
-            inputs=dict(sensor=observations[0]),
-            states=dict(state=states[0]))
-        return [actions["action"]], next_states.values()
-
-
-class ActionNoiseAgent(SimpleRLAgent):
-    """
-    This class extends `SimpleRLAgent` by applying action noise after 
-    prediction. It can be used to algorithms with deterministic policies, e.g.,
-    `DDPG`.
-    """
-
-    def __init__(self,
-                 env,
-                 num_games,
-                 action_noise,
-                 reward_shaping_f=lambda x: x):
-        super(ActionNoiseAgent, self).__init__(env, num_games,
-                                               reward_shaping_f)
-        self.action_noise = action_noise
-
-    def _cts_predict(self, observations, states):
-        ## each action is already 2D
-        assert len(observations) == 1
-        actions, _ = self.predict('RL', inputs=dict(sensor=observations[0]))
-        a = actions.values()[0][0]
-        a = a + self.action_noise.noise()
-
-        return [a], []
-
-    def _reset_env(self):
-        self.action_noise.reset()
-        return super(ActionNoiseAgent, self)._reset_env()
+        return {name : self._make_zero_states(prop) \
+                for name, prop in self.cts_state_specs['RL']}

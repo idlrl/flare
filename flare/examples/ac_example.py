@@ -15,12 +15,20 @@ if __name__ == '__main__':
 
     num_agents = 16
     num_games = 8000
-    # 1. Create environments
-    envs = []
+
+    env = GymEnv(game)
+    state_shape = env.observation_dims()["sensor"]
+    num_actions = env.action_dims()["action"]
+
+    # 1. Spawn one agent for each instance of environment.
+    #    Agent's behavior depends on the actual algorithm being used. Since we
+    #    are using SimpleAC, a proper type of Agent is SimpleRLAgent.
+    reward_shaping_f = lambda x: x / 100.0
+    agents = []
     for _ in range(num_agents):
-        envs.append(GymEnv(game))
-    state_shape = envs[-1].observation_dims()[0]
-    num_actions = envs[-1].action_dims()[0]
+        agent = SimpleRLAgent(num_games, reward_shaping_f=reward_shaping_f)
+        agent.set_env(GymEnv, game_name=game)
+        agents.append(agent)
 
     # 2. Construct the network and specify the algorithm.
     #    Here we use a small MLP and apply the Actor-Critic algorithm
@@ -32,7 +40,8 @@ if __name__ == '__main__':
     alg = SimpleAC(
         model=SimpleModelAC(
             dims=state_shape, num_actions=num_actions, perception_net=mlp),
-        optim=(optim.RMSprop, dict(lr=5e-5)))
+        optim=(optim.RMSprop, dict(lr=5e-5)),
+        gpu_id=-1)  ## use cpu
 
     # 3. Specify the settings for learning: data sampling strategy
     # (OnlineHelper here) and other settings used by
@@ -48,19 +57,6 @@ if __name__ == '__main__':
     }
 
     # 4. Create Manager that handles the running of the whole pipeline
-    manager = Manager(
-        ct_settings, log_settings=dict(
-            model_dir="/tmp/test", pass_num=0)
-    )  ## if pass_num is less than 1, then load the newest model
-
-    # 5. Spawn one agent for each instance of environment.
-    #    Agent's behavior depends on the actual algorithm being used. Since we
-    #    are using SimpleAC, a proper type of Agent is SimpleRLAgent.
-    reward_shaping_f = lambda x: x / 100.0
-    for env in envs:
-        agent = SimpleRLAgent(env, num_games, reward_shaping_f)
-        # An Agent has to be added into the Manager before we can use it to
-        # interact with environment and collect data
-        manager.add_agent(agent)
-
+    manager = Manager(ct_settings)
+    manager.add_agents(agents)
     manager.start()

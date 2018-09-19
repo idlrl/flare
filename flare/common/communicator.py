@@ -5,9 +5,9 @@ class Communicator(object):
     """
     A communicator is responsible for data passing between the simulation side
     (i.e., `AgentHelper`) and the computation side (i.e., `ComputationWrapper`).
-    
-    Communicator's only members are some Queues, which are the channels between 
-    the simulation processes and computation processes. 
+
+    Communicator's only members are some Queues, which are the channels between
+    the simulation processes and computation processes.
 
     Communicator has timeout mechanism. When the get/put operation does not
     return within the specified `timeout`, `Empty`/`Full` exceptions will be
@@ -29,7 +29,7 @@ class Communicator(object):
 
 class CTCommunicator(Communicator):
     """
-    The communicator used by CW. It provides the necessary interfaces for CW to 
+    The communicator used by CW. It provides the necessary interfaces for CW to
     get data from and return results to the simulation side .
     """
 
@@ -41,7 +41,7 @@ class CTCommunicator(Communicator):
         super(CTCommunicator, self).__init__()
         self.training_q = Queue()
         self.prediction_q = Queue()
-        self.comm_timeout = 1
+        self.comm_timeout = 1  ## seconds
 
     def get_training_data(self):
         """
@@ -75,7 +75,7 @@ class CTCommunicator(Communicator):
 class AgentCommunicator(Communicator):
     """
     The communicator used by `AgentHelper`. It provides the necessary
-    interfaces for AgentHelper to send data to and get results from the 
+    interfaces for AgentHelper to send data to and get results from the
     computation side .
     """
 
