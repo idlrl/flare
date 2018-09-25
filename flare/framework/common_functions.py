@@ -98,7 +98,8 @@ class BoW(nn.Module):
             assert std > 0
             self.embedding_table.weight.data.normal_(0, std)
         self.one_more_hidden = one_more_hidden
-        self.hidden = nn.Sequential(nn.Linear(dim, dim), nn.ReLU())
+        if one_more_hidden:
+            self.hidden = nn.Sequential(nn.Linear(dim, dim), nn.ReLU())
 
     def forward(self, sentence):
         def embedding(word):
@@ -120,6 +121,8 @@ def sequence_pooling(seq, pooling_type="average"):
         f = torch.mean
     elif pooling_type == "sum":
         f = torch.sum
+    elif pooling_type == "max":
+        return torch.stack([torch.max(inst, dim=0)[0] for inst in seq])
     else:
         assert False, "Incorrect pooling_type!"
     return torch.stack([f(inst, dim=0) for inst in seq])

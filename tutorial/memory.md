@@ -235,6 +235,19 @@ An agent with short-term memory and sequential inputs will call `recurrent_group
 #### Define model specs
 To define the model of an agent with states, the user needs to override the `get_state_specs` function, which outputs a list of pairs of state names and properties.
 
+***NOTE:*** once the user defines non-empty state keys, the sampled training data will become sequences, according to the code in `<flare_root>/flare/framework/agent.py`:
+```python
+## HERE we decide whether the data are instances or seqs
+## according to the existence of states
+if not self.state_keys:
+    # sample instances
+    for k in ret.keys():
+        if ret[k] is not None:
+            for kk in ret[k].keys():
+                ret[k][kk] = concat_lists(ret[k][kk])
+```
+That means, right now whether any state exists and whether the data are sequential are strictly coupled.
+
 #### Define initial states
 For each state, the user has to specify its initial value before the start of an episode. Usually, the initial values can be zero or randomized vectors. The state will be updated with time based on this initial value. To specify, the user overrides `_get_init_states` in `<flare_root>/flare/framework/agent.py` to return a dictionary of initial states. The keys of this dictionary must have a one-to-one mapping to the keys returned by `get_state_specs`, although the order could be different and decided by the user. An example is defined in `<flare_root>/flare/agent_zoo/simple_rl_agents.py`:
 ```python

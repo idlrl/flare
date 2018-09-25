@@ -90,6 +90,7 @@ class GFTModelAC(Model):
         fusion = self.gft(inputs["screen"], inputs["sentence"])
         prev_action = inputs["prev_action"]
         h_m, h_a, f = states["h_m"], states["h_a"], states["f"]
+
         h_m_ = self.h_m_cell(fusion, h_m)
         h_a_ = self.h_a_cell(
             self.action_embedding(prev_action.squeeze(-1)), h_a)
@@ -128,19 +129,23 @@ if __name__ == "__main__":
     im_size = 84
     options = {
         "x3_conf": "../../flare/env_zoo/tests/walls3d.json",
-        "context": 1,
         "x3_training_img_width": im_size,
         "x3_training_img_height": im_size,
-        "x3_turning_rad": 0.2,
         "curriculum": 0.7,
-        "color": True,
-        "pause_screen": True
+        "color": True
     }
 
     with open("../../flare/env_zoo/tests/dict.txt") as f:
         word_list = [word.strip() for word in f.readlines()]
 
-    env = XWorldEnv("xworld3d", options, word_list, opengl_init=False)
+    env_class = XWorldEnv
+    env_args = dict(
+        game_name="xworld3d",
+        options=options,
+        word_list=word_list,
+        opengl_init=False)
+
+    env = env_class(**env_args)
     d, h, w = env.observation_dims()["screen"]
     voc_size, = env.observation_dims()["sentence"]
     num_actions = env.action_dims()["action"]
@@ -149,14 +154,10 @@ if __name__ == "__main__":
     #    Agent's behavior depends on the actual algorithm being used. Since we
     #    are using SimpleAC, a proper type of Agent is SimpleRLAgent.
     agents = []
+    env_args["opengl_init"] = True
     for _ in range(num_agents):
         agent = SimpleRNNRLAgent(num_games, learning=True, actrep=4)
-        agent.set_env(
-            XWorldEnv,
-            game_name="xworld3d",
-            options=options,
-            word_list=word_list,
-            show_frame=False)
+        agent.set_env(env_class, **env_args)
         agents.append(agent)
 
     # 3. Construct the network and specify the algorithm.
@@ -175,8 +176,8 @@ if __name__ == "__main__":
 
     word_embedding_dim = 128
     bow = BoW(dict_size=voc_size, dim=word_embedding_dim, std=0.1)
-    hidden_size = 2 * word_embedding_dim
 
+    hidden_size = 2 * word_embedding_dim
     hidden_net = nn.Sequential(Flatten(),
                                nn.Linear(7 * 7 * 64, hidden_size), nn.ReLU())
 
@@ -190,8 +191,9 @@ if __name__ == "__main__":
         gpu_id=1,
         value_cost_weight=1.0,
         prob_entropy_weight=0.05,
+        grad_clip=5.0,
         optim=(optim.RMSprop, dict(
-            lr=1e-5, momentum=0.9)),
+            lr=5e-6, momentum=0.9)),
         ntd=True)
 
     # 4. Specify the settings for learning: data sampling strategy

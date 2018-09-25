@@ -73,7 +73,10 @@ class AgentHelper(object):
         ret["next_alive"]["alive"] \
             = [extract_key(exp_seq[1:], "alive") for exp_seq in exp_seqs]
 
-        if not self.state_keys:  # sample instances
+        ## HERE we decide whether the data are instances or seqs
+        ## according to the existence of states
+        if not self.state_keys:
+            # sample instances
             for k in ret.keys():
                 if ret[k] is not None:
                     for kk in ret[k].keys():

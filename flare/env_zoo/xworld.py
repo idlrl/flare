@@ -68,7 +68,8 @@ class XWorldEnv(Env):
         """
         ## copy because we will change actions values; shallow copy is good enough
         act = actions.copy()
-        assert len(act) == 2, "xworld requires two actions, one action, \
+        assert len(
+            act) <= 2, "xworld requires at most two actions, one action, \
                                    one language"
 
         a = act[self.action_key1]
