@@ -1,22 +1,10 @@
 from flare.framework import common_functions as comf
 from simple_algorithms import SimpleQ
 import torch
+import torch.optim as optim
 
 
 class DistributionalAlgorithm(SimpleQ):
-    def __init__(self,
-                 model,
-                 gpu_id=-1,
-                 discount_factor=0.99,
-                 exploration_end_steps=0,
-                 exploration_end_rate=0.1,
-                 update_ref_interval=100,
-                 optim=(optim.RMSprop, dict(lr=1e-4)),
-                 grad_clip=None):
-        super(C51, self).__init__(model, gpu_id, discount_factor,
-                                  exploration_end_steps, exploration_end_rate,
-                                  update_ref_interval, optim, grad_clip)
-
     def learn(self, inputs, next_inputs, states, next_states, next_alive,
               actions, next_actions, rewards):
         if self.update_ref_interval \
@@ -27,6 +15,8 @@ class DistributionalAlgorithm(SimpleQ):
 
         action = actions["action"]
         reward = rewards["reward"]
+
+        self.optim.zero_grad()
 
         values, states_update = self.get_current_values(inputs, states)
         q_distributions = values["q_value_distribution"]
@@ -57,6 +47,11 @@ class DistributionalAlgorithm(SimpleQ):
                              values, next_values)
         avg_cost = comf.get_avg_cost(cost)
         avg_cost.backward(retain_graph=True)
+
+        if self.grad_clip:
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(),
+                                           self.grad_clip)
+        self.optim.step()
 
         return dict(cost=cost)
 
@@ -139,10 +134,12 @@ class C51(DistributionalAlgorithm):
                  discount_factor=0.99,
                  exploration_end_steps=0,
                  exploration_end_rate=0.1,
-                 update_ref_interval=100):
+                 update_ref_interval=100,
+                 optim=(optim.RMSprop, dict(lr=1e-4)),
+                 grad_clip=None):
         super(C51, self).__init__(model, gpu_id, discount_factor,
                                   exploration_end_steps, exploration_end_rate,
-                                  update_ref_interval)
+                                  update_ref_interval, optim, grad_clip)
         vmax = model.vmax
         vmin = model.vmin
         assert vmax > vmin
@@ -225,10 +222,12 @@ class QRDQN(DistributionalAlgorithm):
                  discount_factor=0.99,
                  exploration_end_steps=0,
                  exploration_end_rate=0.1,
-                 update_ref_interval=100):
-        super(QRDQN, self).__init__(model, gpu_id, discount_factor,
-                                    exploration_end_steps,
-                                    exploration_end_rate, update_ref_interval)
+                 update_ref_interval=100,
+                 optim=(optim.RMSprop, dict(lr=1e-4)),
+                 grad_clip=None):
+        super(QRDQN, self).__init__(
+            model, gpu_id, discount_factor, exploration_end_steps,
+            exploration_end_rate, update_ref_interval, optim, grad_clip)
         self.loss = torch.nn.SmoothL1Loss(reduction='none')
 
     def check_alive(self, next_values, next_alive):
@@ -288,12 +287,14 @@ class IQN(QRDQN):
                  exploration_end_steps=0,
                  exploration_end_rate=0.1,
                  update_ref_interval=100,
+                 optim=(optim.RMSprop, dict(lr=1e-4)),
+                 grad_clip=None,
                  N=8,
                  N_prime=8,
                  K=32):
         super(IQN, self).__init__(model, gpu_id, discount_factor,
                                   exploration_end_steps, exploration_end_rate,
-                                  update_ref_interval)
+                                  update_ref_interval, optim, grad_clip)
         assert N > 0
         assert N_prime > 0
         assert K > 0

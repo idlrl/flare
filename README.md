@@ -15,7 +15,6 @@ FLARE is a reinforcement learning (RL) framework for training [embodied agents](
 ## Prerequisites
 FLARE is currently a pure Python framework which doesn't need build. Several dependent tools:
 * [PyTorch](https://pytorch.org/)
-* [Glog](https://pypi.org/project/glog/)
 * [OpenAI Gym](https://gym.openai.com/) (for running examples)
 
 That's it. Enjoy training agents with FLARE!
@@ -60,13 +59,21 @@ game = "CartPole-v0"
 num_agents = 16    ## 16 agents running in parallel
 num_games = 8000   ## each agent runs for 8000 games
 
-envs = []
-for _ in range(num_agents):
-    envs.append(GymEnv(game))  ## init an environment for each agent
+env = GymEnv(game)
+## get the shape of observation 'sensor'
+state_shape = env.observation_dims()["sensor"]
+## get the number of action 'action'
+num_actions = env.action_dims()["action"]
 
-## get the environment observation dimension and the number of actions
-state_shape = envs[-1].observation_dims()[0]
-num_actions = envs[-1].action_dims()[0]
+# Spawn 16 agents and add an environment to each agent.
+# Agent's behavior depends on the actual algorithm being used. Since we
+# are using SimpleAC, a proper type of Agent is SimpleRLAgent.
+reward_shaping_f = lambda x: x / 100.0 # when learning, we scale the reward by 0.01
+agents = []
+for _ in range(num_agents):
+    agent = SimpleRLAgent(num_games, reward_shaping_f=reward_shaping_f)
+    agent.set_env(GymEnv, game_name=game)
+    agents.append(agent)
 ```
 
 c) Next we construct the neural network and choose the algorithm to train the network.
@@ -84,8 +91,11 @@ mlp = nn.Sequential(
 ## algorithm called SimpleAC; it implements simple Actor-critic by taking
 ## the latent embedding output by the model defined above to generate a discrete
 ## policy and a value.
-alg = SimpleAC(model=SimpleModelAC(
-    dims=state_shape, num_actions=num_actions, perception_net=mlp))
+alg = SimpleAC(
+    model=SimpleModelAC(
+        dims=state_shape, num_actions=num_actions, perception_net=mlp),
+    optim=(optim.RMSprop, dict(lr=5e-5)),
+    gpu_id=-1)  ## use cpu
 ```
 
 d) In this example, each agent has a single computation task (i.e., 'RL'). Below we set the hyperparameters and options for this computation task, and create a Manager from the settings.
@@ -94,27 +104,20 @@ d) In this example, each agent has a single computation task (i.e., 'RL'). Below
 ct_settings = {
     "RL": dict(
         algorithm=alg,       ## pass in the algorithm object
-        hyperparas=dict(lr=5e-5),   ## set the learning rate
         # sampling
         agent_helper=OnlineHelper,   ## the training data collection is online
         # each agent will call `learn()` every `sample_interval` steps
         sample_interval=4,
         num_agents=num_agents)
 }
-### create a manager that handles the running of the whole pipeline
-manager = Manager(ct_settings)
 ```
 
-e) Add all the 16 agents to the manager and start training!
+e) Add all the agents to the manager and start training!
 
 ```python
-# Spawn one agent for each instance of environment.
-for env in envs:
-    agent = SimpleRLAgent(env, num_games)
-    # An agent has to be added into the manager before we can use it to
-    # interact with environment and collect data
-    manager.add_agent(agent)
-
+### create a manager that handles the running of the whole pipeline
+manager = Manager(ct_settings)
+manager.add_agents(agents)
 manager.start()
 ```
 
@@ -126,21 +129,23 @@ cd <flare_root>; python flare/examples/ac_example.py
 The game reward is expected to reach and maintain the maximal value of 199.0 (i.e., the cart holds the pole until timeout) after about 4k games trained on a machine with 16 CPUs.
 
 ## Easy adaptation to new problems
-Suppose now we still want to use Actor-critic to train an agent, but this time to play [Breakout](https://en.wikipedia.org/wiki/Breakout_(video_game)) from raw pixel inputs. Because of the flexibility of FLARE, we are able to easily adapt the above code to solve the new problem by only having to redefine the perception net of the model:
+Suppose now we still want to use Actor-critic to train an agent, but this time to play [Breakout](https://en.wikipedia.org/wiki/Breakout_(video_game)) from raw pixel inputs. Because of the flexibility of FLARE, we are able to easily adapt the above code to solve the new problem by making the change:
 ```python
-# 1. Create image environments
-im_height, im_width = 84, 84 # always resize image to 84x84
-envs = []
+im_height, im_width = 84, 84  # always resize image to 84x84
+env_class = GymEnvImage
+env_args = dict(game_name=game, contexts=4, height=im_height, width=im_width, gray=True)
+
+env = env_class(**env_args)
+d, h, w = env.observation_dims()["sensor"]
+num_actions = env.action_dims()["action"]
+
+agents = []
 for _ in range(num_agents):
-    envs.append(GymEnvImage(game, contexts=4,
-                            height=im_height, width=im_width, gray=True))
+    agent = SimpleRLAgent(num_games, reward_shaping_f=np.sign) # ignore reward magnitude
+    agent.set_env(env_class, **env_args)
+    agents.append(agent)
 
-# context screens
-d, h, w = envs[-1].observation_dims()[0]
-num_actions = envs[-1].action_dims()[0]
-
-# 2. Construct the network and specify the algorithm.
-#    Here we use a small CNN as the perception net for the Actor-Critic algorithm
+# Here we use a small CNN as the perception net for the Actor-Critic algorithm
 cnn = nn.Sequential(
     nn.Conv2d(d, 32, kernel_size=8, stride=4),
     nn.ReLU(),
@@ -153,9 +158,12 @@ cnn = nn.Sequential(
     nn.ReLU()
 )
 
-alg = SimpleAC(model=SimpleModelAC(
-    dims=(d, h, w), num_actions=num_actions, perception_net=cnn),
-               gpu_id=1)
+alg = SimpleAC(
+    model=SimpleModelAC(
+        dims=(d, h, w), num_actions=num_actions, perception_net=cnn),
+    optim=(optim.RMsprop, dict(lr=1e-4)),
+    grad_clip=5.0,  # clip to prevent gradient explosion
+    gpu_id=1)
 ```
 Except for some hyperparameters (e.g., number of agents, learning rate, gradient clipping, etc), the rest of the code logic is unchanged. To run this example:
 ```bash

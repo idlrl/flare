@@ -2,6 +2,7 @@ from flare.framework.algorithm import Algorithm
 from flare.algorithm_zoo.simple_algorithms import SimpleQ
 from flare.framework import common_functions as comf
 import torch
+import torch.optim as optim
 import numpy as np
 from copy import deepcopy
 
@@ -14,6 +15,8 @@ class SuccessorRepresentationQ(SimpleQ):
     1. https://www.youtube.com/watch?v=OCHwXxSW70o, Tejas Kulkarni
     2. "Successor Features for Transfer in Reinforcement Learning", Barreto et al., 2017
     3. "Visual Semantic Planning using Deep Successor Representations", Zhu el al., 2017
+
+    Currently this class does not support short-term memory.
     """
 
     def __init__(self,
@@ -22,7 +25,9 @@ class SuccessorRepresentationQ(SimpleQ):
                  discount_factor=0.99,
                  exploration_end_steps=0,
                  exploration_end_rate=0.1,
-                 reward_cost_weight=1.0):
+                 optim=(optim.RMSprop, dict(lr=1e-4)),
+                 reward_cost_weight=1.0,
+                 reconstruction_cost_weight=1.0):
 
         super(SuccessorRepresentationQ, self).__init__(
             model=model,
@@ -30,8 +35,9 @@ class SuccessorRepresentationQ(SimpleQ):
             discount_factor=discount_factor,
             exploration_end_steps=exploration_end_steps,
             exploration_end_rate=exploration_end_rate,
-            update_ref_interval=0)
-
+            update_ref_interval=0,
+            optim=optim)
+        self.recon_cost_weight = reconstruction_cost_weight
         self.reward_cost_weight = reward_cost_weight
 
     def learn(self, inputs, next_inputs, states, next_states, next_alive,
@@ -59,12 +65,18 @@ class SuccessorRepresentationQ(SimpleQ):
         next_action = next_actions["action"]
         reward = rewards["reward"]
 
+        self.optim.zero_grad()
+
         ## 1. learn to predict rewards
-        next_state_embedding = self.model.state_embedding(next_inputs)
+        next_state_embedding, recon_cost = self.model.state_embedding(
+            next_inputs)
+        recon_cost *= self.recon_cost_weight
+
         # the goal and reward evaluation should be based on the current inputs
         goal = self.model.goal(inputs)
         pred_reward = comf.inner_prod(next_state_embedding, goal)
-        reward_cost = (pred_reward - reward)**2 * self.reward_cost_weight
+        reward_cost = (
+            pred_reward - reward).squeeze(-1)**2 * self.reward_cost_weight
 
         ## 2. use Bellman equation to learn successor representation
         srs, states_update = self.model.sr(inputs, states)  ## BxAxD
@@ -88,9 +100,16 @@ class SuccessorRepresentationQ(SimpleQ):
         sr_cost = (
             next_state_embedding.detach() + self.discount_factor * next_sr - sr
         )**2
-        sr_cost = sr_cost.mean(-1).unsqueeze(-1)
+        sr_cost = sr_cost.mean(-1)
 
-        avg_cost = comf.get_avg_cost(reward_cost + sr_cost)
-        avg_cost.backward(retain_graph=True)
+        cost = recon_cost + reward_cost + sr_cost
+        sum_cost, _ = comf.sum_cost_tensor(cost)
+        sum_cost.backward()
 
-        return dict(cost=reward_cost + sr_cost)
+        self.optim.step()
+
+        return dict(
+            cost=cost,
+            reconstruction_cost=recon_cost,
+            reward_cost=reward_cost,
+            sr_cost=sr_cost)

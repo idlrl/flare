@@ -235,10 +235,28 @@ An agent with short-term memory and sequential inputs will call `recurrent_group
 #### Define model specs
 To define the model of an agent with states, the user needs to override the `get_state_specs` function, which outputs a list of pairs of state names and properties.
 
-#### Define initial states
-For each state, the user has to specify its initial value before the start of an episode. Usually, the initial values can be zero or randomized vectors. The state will be updated based on this initial value. To specify, the user overrides `_get_init_states` in `<flare_root>/flare/framework/agent.py` to return a list of initial states. *This list has to have a one-to-one mapping to the list returned by `get_state_specs`*, although the order could be different and decided by the user.
+***NOTE:*** once the user defines non-empty state keys, the sampled training data will become sequences, according to the code in `<flare_root>/flare/framework/agent.py`:
+```python
+## HERE we decide whether the data are instances or seqs
+## according to the existence of states
+if not self.state_keys:
+    # sample instances
+    for k in ret.keys():
+        if ret[k] is not None:
+            for kk in ret[k].keys():
+                ret[k][kk] = concat_lists(ret[k][kk])
+```
+That means, right now whether any state exists and whether the data are sequential are strictly coupled.
 
-#### Additional learning and prediction arguments
+#### Define initial states
+For each state, the user has to specify its initial value before the start of an episode. Usually, the initial values can be zero or randomized vectors. The state will be updated with time based on this initial value. To specify, the user overrides `_get_init_states` in `<flare_root>/flare/framework/agent.py` to return a dictionary of initial states. The keys of this dictionary must have a one-to-one mapping to the keys returned by `get_state_specs`, although the order could be different and decided by the user. An example is defined in `<flare_root>/flare/agent_zoo/simple_rl_agents.py`:
+```python
+def _get_init_states(self):
+    return {name : self._make_zero_states(prop) \
+            for name, prop in self.cts_state_specs['RL']}
+```
+
+#### Receive additional learning and prediction arguments
 After defining the above two functions, now the user can expect to have additional prediction and learning arguments in CT's `predict` and `learn`. Recall that in [Modules](modules.md), we skip the explanations for the states:
 
 * `states`: the states at the current time step
@@ -248,7 +266,13 @@ For `predict`, `next_states` is an output; for `learn`, it is provided as an inp
 
 The user should expect that both `states` and `next_states` as dictionaries contain the keywords that exactly match the names returned by the model's `get_state_specs`. A state's data format should comply with what has been introduced in [States](#states).
 
-Below is an example model `SimpleRNNModelAC` for an agent with short-term memory:
+### Prediction with memory
+
+#### Prediction logic keeps unchanged
+With short-term memory, `predict` still operates at single time steps. The only difference is the additional states input. The prediction function should take into account the states when predicting actions.
+
+#### Define models that exploit states
+To be called by `predict`, a model is also expected to operate at single time steps. Below is an example model `SimpleRNNModelAC` for an agent with short-term memory:
 ```python
 class SimpleRNNModelAC(Model):
     def __init__(self, dims, num_actions, perception_net):
@@ -287,14 +311,7 @@ class SimpleRNNModelAC(Model):
         return dict(v_value=self.value_layer(next_state)), dict(
             state=next_state)
 ```
-coupled with
-```python
-def _get_init_states(self):
-    return [self._make_zero_states(prop) for _, prop in self.cts_state_specs['RL']]
-```
-in `<flare_root>/flare/agent_zoo/simple_rl_agents.py`.
-
-The majority of `SimpleRNNModelAC` is the same with `SimpleModelAC`. The only difference is a recurrent layer that updates the RNN state.
+We can see that the majority of `SimpleRNNModelAC` is the same with `SimpleModelAC`. The only difference is a recurrent layer that updates the RNN state.
 
 #### Prediction *vs.* learning regarding sequential data
 For an agent with short-term memory, `predict` always has one level less than `learn` in their sequential input data. The reason is that, `predict` is called at the current time step while `learn` is called on sequences in order for the agent to learn temporal dependencies. Below are two example batches assembled from multiple agents by a [CDP](modules.md).
@@ -303,3 +320,49 @@ For an agent with short-term memory, `predict` always has one level less than `l
 
 
 As mentioned in [States](#states), for both `predict` and `learn`, a state input doesn't have any sequential information. So both will have the same state format. In the former, a state is from the previous time step; in the latter, a state (sampled from a history buffer) is used as an initial vector to boot the corresponding sequence.
+
+#### Define algorithms that exploit states
+The tricky part of defining an [Algorithm](modules.md) is to define its `learn` function whose input data are sequences. The user could use `recurrent_group` we have talked about to ease this process. However, as a general sequence handling function, `recurrent_group` requires its inputs and outputs as lists which are different from the input/output dictionaries of `learn`. To this end, we further provide `AgentRecurrentHelper` to automatically handle calling of `recurrent_group` on dictionaries. An example of using `AgentRecurrentHelper` in `learn` is below:
+
+```python
+def learn(self, inputs, next_inputs, states, next_states, next_alive,
+          actions, next_actions, rewards):
+    recurrent_helper = AgentRecurrentHelper()
+    self.optim.zero_grad()
+    if states:
+        ## next_values will preserve the sequential information!
+        next_values = recurrent_helper.recurrent(
+            ## step function operates one-level lower
+            recurrent_step=self.compute_next_values,
+            input_dict_list=[next_inputs,
+                             next_actions,
+                             next_alive],
+            state_dict_list=[next_states])
+
+        if self.ntd:  ## we need sequential information for n-step TD
+            rewards = {k : comf.prepare_ntd_reward(r, self.discount_factor) \
+                       for k, r in rewards.iteritems()}
+            next_values = {k : comf.prepare_ntd_value(v, self.discount_factor) \
+                           for k, v in next_values.iteritems()}
+
+        ## costs will preserve the sequential information!
+        costs = recurrent_helper.recurrent(
+            ## step function operates one-level lower
+            recurrent_step=self._rl_learn,
+            input_dict_list=[inputs,
+                             actions,
+                             next_values,
+                             rewards],
+            state_dict_list=[states])
+    else:
+        next_values, _ = self.compute_next_values(
+            next_inputs, next_actions, next_alive, next_states)
+        costs, _ = self._rl_learn(inputs, actions, next_values, rewards, states)
+
+    if self.grad_clip:
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(),
+                                       self.grad_clip)
+    self.optim.step()
+    return costs
+```
+Once the user uses `AgentRecurrentHelper` to strip one level, he will be able to call the `Model` functions inside the recurrent step function. In a more general case, the user could use `AgentRecurrentHelper` again in the step function, potentially even in a recursive way.

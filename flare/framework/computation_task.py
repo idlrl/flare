@@ -1,8 +1,7 @@
 import os
 import glob
-import glog
+import logging
 import torch
-import torch.optim as optim
 from algorithm import Model, Algorithm
 import recurrent as rc
 import numpy as np
@@ -22,7 +21,15 @@ class ComputationTask(object):
     c. define a ComputationTask with the algorithm
     """
 
-    def __init__(self, name, algorithm, model_dir="", pass_num=0, **kwargs):
+    def __init__(self,
+                 name,
+                 algorithm,
+                 show_para_every_backwards=0,
+                 load_model=False,
+                 model_dir="",
+                 pass_num=0,
+                 **kwargs):
+
         assert isinstance(algorithm, Algorithm)
         self.name = name
         if model_dir == "":
@@ -31,10 +38,11 @@ class ComputationTask(object):
             os.system("mkdir -p " + model_dir)
             self.model_dir = model_dir
         self.alg = algorithm
+        self.show_para_every_backwards = show_para_every_backwards
         self._cdp_args = kwargs
         self._cdp = None
         ## if model_dir is not empty, then we load an init model
-        if self.model_dir != "":
+        if load_model and self.model_dir != "":
             if glob.glob(self.model_dir + "/*"):
                 if pass_num > 0:
                     model_file = self.model_dir + ("/%06d/%s.w" %
@@ -43,9 +51,11 @@ class ComputationTask(object):
                     ## otherwise we take the most recent model
                     model_file = self.model_dir + "/lastest/" + self.name + ".w"
                 self.alg.model.load_state_dict(torch.load(model_file))
-                glog.info("CT[%s] model loaded from '%s'" %
-                          (self.name, model_file))
+                logging.info("CT[%s] model loaded from '%s'" %
+                             (self.name, model_file))
+
         self.model_save_signal = Value('i', -1)
+        self.backwards = 0  ## how may backwards so far
 
     def save_model(self, idx):
         if self.model_dir != "":
@@ -57,7 +67,8 @@ class ComputationTask(object):
             os.system("mkdir -p " + os.path.dirname(lastest_model_file))
             torch.save(self.alg.model.state_dict(), model_file)
             torch.save(self.alg.model.state_dict(), lastest_model_file)
-            glog.info("CT[%s] model saved to '%s'" % (self.name, model_file))
+            logging.info("CT[%s] model saved to '%s'" %
+                         (self.name, model_file))
 
     def get_state_specs(self):
         return self.alg.get_state_specs()
@@ -164,4 +175,20 @@ class ComputationTask(object):
         for i in range(self.alg.iterations_per_batch):
             costs = self.alg.learn(inputs, next_inputs, states, next_states,
                                    next_alive, actions, next_actions, rewards)
-        return self._retrieve_np_arrays(costs)
+            self.backwards += 1
+            if self.show_para_every_backwards \
+               and self.backwards % self.show_para_every_backwards == 0:
+                print "=== Parameter staticis for CT[%s] - START ===" % self.name
+                for name, para in self.alg.model.named_parameters():
+                    min_val = float(torch.min(para))
+                    max_val = float(torch.max(para))
+                    min_grad = float(torch.min(para.grad.data))
+                    max_grad = float(torch.max(para.grad.data))
+                    print name.ljust(50) \
+                        + ("min_val: %f" % min_val).ljust(30) \
+                        + ("max_val: %f" % max_val).ljust(30) \
+                        + ("min_grad: %f" % min_grad).ljust(30) \
+                        + ("max_grad: %f" % max_grad).ljust(30)
+                print "=== Parameter staticis for CT[%s] - END ===" % self.name
+
+        return self._retrieve_np_arrays(costs), dict()

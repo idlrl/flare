@@ -23,20 +23,24 @@ class TestXWorld(unittest.TestCase):
         self.env = XWorldEnv("xworld3d", options, word_list)
 
     def test_reset(self):
-        screen, sentence = self.env.reset()
+        ob = self.env.reset()
         # the channel num = color x context = 3 x 3
-        self.assertEqual(screen.shape, (9, 64, 64))
+        self.assertEqual(ob["screen"].shape, (9, 64, 64))
 
-        self.assertIsInstance(sentence, list)
-        self.assertIsInstance(sentence[0], np.ndarray)
+        self.assertIsInstance(ob["sentence"], list)
+        self.assertIsInstance(ob["sentence"][0], np.ndarray)
 
     def test_step(self):
         self.env.reset()
-        act_dim, word_dim = self.env.action_dims()
-        a = np.array([randint(0, act_dim - 1)])
-        sentence = [np.array([randint(0, word_dim - 1)]) for i in range(10)]
-
-        states, rewards, next_game_over = self.env.step([a, sentence])
+        dims = self.env.action_dims()
+        a = np.array([randint(0, dims["action"] - 1)])
+        sentence = [
+            np.array([randint(0, dims["pred_sentence"] - 1)])
+            for i in range(10)
+        ]
+        states, rewards, next_game_over = self.env.step(
+            dict(
+                action=a, pred_sentence=sentence))
 
 
 if __name__ == "__main__":

@@ -29,7 +29,7 @@ class ComputationDataProcessor(object):
         Pack a list of data into one dict according to network's inputs specs.
 
         Args:
-            data(list of dict): a list of data collected from Agents.
+            data(list of dict): a list of tuples (data, size) collected from Agents.
         """
         assert isinstance(data, list)
         data, sizes = zip(*data)
@@ -84,7 +84,7 @@ class ComputationDataProcessor(object):
         data, starts = self._pack_data(data)
         with self.lock:
             ret = self.ct.learn(**data)
-        #ret = self._unpack_data(ret, starts)
+        ret = self._unpack_data(ret, starts)
         return ret
 
     def _prediction_loop(self):
@@ -120,11 +120,10 @@ class ComputationDataProcessor(object):
                     data.append(d)
             except Empty as e:
                 continue
-            # TODO: handle ret as a list, one element for each agent
             ret = self.do_one_training(data)
             try:
                 for i in range(len(agent_ids)):
-                    self.comm.training_return(ret, self.comms[agent_ids[i]])
+                    self.comm.training_return(ret[i], self.comms[agent_ids[i]])
             except Full as e:
                 pass
             agent_ids = []

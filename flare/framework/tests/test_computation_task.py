@@ -129,8 +129,8 @@ class TestComputationTask(unittest.TestCase):
         outputs0, _ = ct0.predict(inputs=dict(sensor=sensor))
         outputs1, _ = ct1.predict(inputs=dict(sensor=sensor))
         self.assertEqual(
-            np.sum(outputs0["continuous_action"].flatten()),
-            np.sum(outputs1["continuous_action"].flatten()))
+            np.sum(outputs0["action"].flatten()),
+            np.sum(outputs1["action"].flatten()))
 
     def test_ct_para_copy(self):
         """
@@ -150,8 +150,8 @@ class TestComputationTask(unittest.TestCase):
         outputs0, _ = ct0.predict(inputs=dict(sensor=sensor))
         outputs1, _ = ct1.predict(inputs=dict(sensor=sensor))
         self.assertEqual(
-            np.sum(outputs0["continuous_action"].flatten()),
-            np.sum(outputs1["continuous_action"].flatten()))
+            np.sum(outputs0["action"].flatten()),
+            np.sum(outputs1["action"].flatten()))
 
     def test_ct_learning(self):
         """

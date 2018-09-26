@@ -13,6 +13,9 @@ class Experience(object):
         self.data = data
 
     def is_episode_end(self):
+        ## self.alive:  0  -- success/failure
+        ##              1  -- normal
+        ##             -1  -- timeout
         return self.alive <= 0
 
     def val(self, key):
@@ -120,6 +123,12 @@ class NoReplacementQueue(object):
         self.q.append(deepcopy(t))
 
     def sample(self):
+        """
+        When sample_interval=n, for the first time this function will return
+        n-1 instances and leave the last instance in the queue. After that,
+        every time this function returns n instances. If there are episode
+        ends in the queue, the number will be smaller.
+        """
         exp_seqs = []
         while len(self.q) > 1:
             exps = []

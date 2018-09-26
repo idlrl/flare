@@ -1,3 +1,4 @@
+from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 import numpy as np
 from torch.distributions import Categorical
@@ -8,44 +9,107 @@ from flare.framework import common_functions as comf
 import flare.framework.recurrent as rc
 
 
-class SimpleAC(Algorithm):
+class SimpleAlgorithm(Algorithm):
+    """
+    A base class for simple algorithms in this file.
+    """
+    __metaclass__ = ABCMeta
+
+    def __init__(self, model, gpu_id, discount_factor, optim, grad_clip, ntd):
+        super(SimpleAlgorithm, self).__init__(model, gpu_id)
+        self.discount_factor = discount_factor
+        self.optim = optim[0](self.model.parameters(), **optim[1])
+        self.ntd = ntd
+        self.grad_clip = grad_clip
+        self.recurrent_helper = rc.AgentRecurrentHelper()
+
+    def learn(self, inputs, next_inputs, states, next_states, next_alive,
+              actions, next_actions, rewards):
+        self.optim.zero_grad()
+        if states:
+            ## next_values will preserve the sequential information!
+            next_values = self.recurrent_helper.recurrent(
+                ## step function operates one-level lower
+                recurrent_step=self.compute_next_values,
+                input_dict_list=[next_inputs, next_actions, next_alive],
+                state_dict_list=[next_states])
+
+            if self.ntd:  ## we need sequential information for n-step TD
+                rewards = {k : comf.prepare_ntd_reward(r, self.discount_factor) \
+                           for k, r in rewards.iteritems()}
+                next_values = {k : comf.prepare_ntd_value(v, self.discount_factor) \
+                               for k, v in next_values.iteritems()}
+
+            ## costs will preserve the sequential information!
+            costs = self.recurrent_helper.recurrent(
+                ## step function operates one-level lower
+                recurrent_step=self._rl_learn,
+                input_dict_list=[inputs, actions, next_values, rewards],
+                state_dict_list=[states])
+        else:
+            ## If no sequential data, ntd=True will be ignored
+            next_values, _ = self.compute_next_values(
+                next_inputs, next_actions, next_alive, next_states)
+            costs, _ = self._rl_learn(inputs, actions, next_values, rewards,
+                                      states)
+
+        if self.grad_clip:
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(),
+                                           self.grad_clip)
+        self.optim.step()
+        return costs
+
+    def predict(self, inputs, states):
+        return self._rl_predict(self.model, inputs, states)
+
+    @abstractmethod
+    def compute_next_values(self, next_inputs, next_actions, next_alive,
+                            next_states):
+        """
+        A child class must implement this to decide how to compute next values
+
+        Return: next_values(dict), next_states_update(dict)
+        """
+        pass
+
+    @abstractmethod
+    def _rl_learn(self, inputs, actions, next_values, rewards, states):
+        """
+        A child class must implement this learning function to compute costs and gradients
+
+        Return: costs(dict), states_update(dict)
+        """
+        pass
+
+
+class SimpleAC(SimpleAlgorithm):
     """
     A simple Actor-Critic that has a feedforward policy network and
     a single action.
-
-    learn() requires keywords: "action", "reward", "v_value"
     """
 
     def __init__(self,
                  model,
                  gpu_id=-1,
                  discount_factor=0.99,
-                 value_cost_weight=0.5,
+                 value_cost_weight=1.0,
                  prob_entropy_weight=0.01,
                  optim=(optim.RMSprop, dict(lr=1e-4)),
-                 grad_clip=None):
+                 grad_clip=None,
+                 ntd=False):
 
-        super(SimpleAC, self).__init__(model, gpu_id)
-        self.discount_factor = discount_factor
+        super(SimpleAC, self).__init__(model, gpu_id, discount_factor, optim,
+                                       grad_clip, ntd)
         self.value_cost_weight = value_cost_weight
         self.prob_entropy_weight = prob_entropy_weight
-        self.optim = optim[0](self.model.parameters(), **optim[1])
-        self.grad_clip = grad_clip
 
-    def _rl_learn(self, inputs, next_inputs, states, next_states, next_alive,
-                  actions, next_actions, rewards):
+    def _rl_learn(self, inputs, actions, next_values, rewards, states):
         action = actions["action"]
         reward = rewards["reward"]
 
         values, states_update = self.model.value(inputs, states)
         value = values["v_value"]
-
-        with torch.no_grad():
-            next_values, next_states_update = self.model.value(next_inputs,
-                                                               next_states)
-            next_value = next_values["v_value"] * torch.abs(next_alive[
-                "alive"])
-
+        next_value = next_values["v_value"]
         assert value.size() == next_value.size()
 
         critic_value = reward + self.discount_factor * next_value
@@ -61,44 +125,33 @@ class SimpleAC(Algorithm):
         else:
             pg_cost = -dist.log_prob(action)
 
-        cost = self.value_cost_weight * value_cost \
-               + pg_cost * td_error.detach() \
-               - self.prob_entropy_weight * dist.entropy()  ## increase entropy for exploration
-        sum_of_costs, _ = comf.sum_cost(cost)
-        sum_of_costs.backward(retain_graph=True)
+        value_cost *= self.value_cost_weight
+        pg_cost *= td_error.detach()
+        entropy_cost = self.prob_entropy_weight * dist.entropy()
 
-        return dict(cost=cost), states_update, next_states_update
+        cost = value_cost + pg_cost - entropy_cost  ## increase entropy for exploration
 
-    def learn(self, inputs, next_inputs, states, next_states, next_alive,
-              actions, next_actions, rewards):
-        self.optim.zero_grad()
-        if states:
-            costs = rc.call_recurrent_group(
-                self._rl_learn, inputs, next_inputs, states, next_states,
-                next_alive, actions, next_actions, rewards)
-        else:
-            costs, states_update, next_states_update = self._rl_learn(
-                inputs, next_inputs, states, next_states, next_alive, actions,
-                next_actions, rewards)
+        sum_cost, _ = comf.sum_cost_tensor(cost)
+        sum_cost.backward(retain_graph=True)
+        return dict(cost=cost,
+                    pg_cost=pg_cost,
+                    value_cost=value_cost,
+                    entropy_cost=entropy_cost), \
+            states_update
 
-        cost = costs["cost"]
-
-        if self.grad_clip:
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(),
-                                           self.grad_clip)
-        self.optim.step()
-
-        return dict(cost=cost)
-
-    def predict(self, inputs, states):
-        return self._rl_predict(self.model, inputs, states)
+    def compute_next_values(self, next_inputs, next_actions, next_alive,
+                            next_states):
+        with torch.no_grad():
+            next_values, next_states_update = self.model.value(next_inputs,
+                                                               next_states)
+            next_values = {k : v * torch.abs(next_alive["alive"]) \
+                           for k, v in next_values.iteritems()}
+        return next_values, next_states_update
 
 
-class SimpleQ(Algorithm):
+class SimpleQ(SimpleAlgorithm):
     """
     A simple Q-learning that has a feedforward policy network and a single discrete action.
-
-    learn() requires keywords: "action", "reward", "q_value"
     """
 
     def __init__(self,
@@ -109,10 +162,11 @@ class SimpleQ(Algorithm):
                  exploration_end_rate=0.1,
                  update_ref_interval=100,
                  optim=(optim.RMSprop, dict(lr=1e-4)),
-                 grad_clip=None):
+                 grad_clip=None,
+                 ntd=False):
 
-        super(SimpleQ, self).__init__(model, gpu_id)
-        self.discount_factor = discount_factor
+        super(SimpleQ, self).__init__(model, gpu_id, discount_factor, optim,
+                                      grad_clip, ntd)
         self.update_ref_interval = update_ref_interval
         self.total_batches = 0
         ## create a reference model
@@ -129,8 +183,6 @@ class SimpleQ(Algorithm):
                 = (1 - exploration_end_rate) / exploration_end_steps
         else:
             self.exploration_rate = 0.0
-        self.optim = optim[0](self.model.parameters(), **optim[1])
-        self.grad_clip = grad_clip
 
     def predict(self, inputs, states):
         """
@@ -154,8 +206,7 @@ class SimpleQ(Algorithm):
 
         return actions, states
 
-    def learn(self, inputs, next_inputs, states, next_states, next_alive,
-              actions, next_actions, rewards):
+    def _rl_learn(self, inputs, actions, next_values, rewards, states):
 
         if self.update_ref_interval and self.total_batches % self.update_ref_interval == 0:
             ## copy parameters from self.model to self.ref_model
@@ -167,30 +218,24 @@ class SimpleQ(Algorithm):
 
         values, states_update = self.model.value(inputs, states)
         q_value = values["q_value"]
-
-        with torch.no_grad():
-            next_values, next_states_update = self.ref_model.value(next_inputs,
-                                                                   next_states)
-            next_q_value = next_values["q_value"] * torch.abs(next_alive[
-                "alive"])
-            next_value, _ = next_q_value.max(-1)
-            next_value = next_value.unsqueeze(-1)
-
-        assert q_value.size() == next_q_value.size()
+        next_value = next_values["q_value"]
 
         value = comf.idx_select(q_value, action)
         critic_value = reward + self.discount_factor * next_value
         cost = (critic_value - value)**2
 
-        avg_cost = comf.get_avg_cost(cost)
-        self.optim.zero_grad()
-        avg_cost.backward(retain_graph=True)
-        if self.grad_clip:
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(),
-                                           self.grad_clip)
-        self.optim.step()
+        sum_cost, _ = comf.sum_cost_tensor(cost)
+        sum_cost.backward(retain_graph=True)
+        return dict(cost=cost), states_update
 
-        return dict(cost=cost)
+    def compute_next_values(self, next_inputs, next_actions, next_alive,
+                            next_states):
+        with torch.no_grad():
+            next_values, next_states_update = self.ref_model.value(next_inputs,
+                                                                   next_states)
+            next_values = {k : (q * torch.abs(next_alive["alive"])).max(-1)[0].unsqueeze(-1) \
+                           for k, q in next_values.iteritems()}
+        return next_values, next_states_update
 
 
 class SimpleSARSA(SimpleQ):
@@ -200,7 +245,8 @@ class SimpleSARSA(SimpleQ):
                  discount_factor=0.99,
                  epsilon=0.1,
                  optim=(optim.RMSprop, dict(lr=1e-4)),
-                 grad_clip=None):
+                 grad_clip=None,
+                 ntd=False):
 
         super(SimpleSARSA, self).__init__(
             model=model,
@@ -210,39 +256,36 @@ class SimpleSARSA(SimpleQ):
             exploration_end_rate=epsilon,
             update_ref_interval=0,
             optim=optim,
-            grad_clip=grad_clip)
+            grad_clip=grad_clip,
+            ntd=ntd)
 
-    def learn(self, inputs, next_inputs, states, next_states, next_alive,
-              actions, next_actions, rewards):
+    def compute_next_values(self, next_inputs, next_actions, next_alive,
+                            next_states):
+        with torch.no_grad():
+            next_action = next_actions["action"]
+            next_values, next_states_update = self.model.value(next_inputs,
+                                                               next_states)
+            next_values = {k : comf.idx_select(q * torch.abs(next_alive["alive"]), next_action) \
+                           for k, q in next_values.iteritems()}
+        return next_values, next_states_update
 
+    def _rl_learn(self, inputs, actions, next_values, rewards, states):
         action = actions["action"]
-        next_action = next_actions["action"]
         reward = rewards["reward"]
 
         values, states_update = self.model.value(inputs, states)
         q_value = values["q_value"]
-
-        with torch.no_grad():
-            next_values, next_states_update = self.model.value(next_inputs,
-                                                               next_states)
-            next_value = comf.idx_select(next_values["q_value"], next_action)
-            next_value = next_value * torch.abs(next_alive["alive"])
+        next_value = next_values["q_value"]
 
         critic_value = reward + self.discount_factor * next_value
         cost = (critic_value - comf.idx_select(q_value, action))**2
 
-        avg_cost = comf.get_avg_cost(cost)
-        self.optim.zero_grad()
-        avg_cost.backward(retain_graph=True)
-        if self.grad_clip:
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(),
-                                           self.grad_clip)
-        self.optim.step()
-
-        return dict(cost=cost)
+        sum_cost, _ = comf.sum_cost_tensor(cost)
+        sum_cost.backward(retain_graph=True)
+        return dict(cost=cost), states_update
 
 
-class OffPolicyAC(Algorithm):
+class OffPolicyAC(SimpleAC):
     """
     Off-policy AC with clipped importance ratio.
     Refer to PPO2 objective for details.
@@ -256,15 +299,15 @@ class OffPolicyAC(Algorithm):
                  gpu_id=-1,
                  discount_factor=0.99,
                  value_cost_weight=1.0,
+                 prob_entropy_weight=0.01,
                  optim=(optim.RMSprop, dict(lr=1e-4)),
-                 grad_clip=None):
+                 grad_clip=None,
+                 ntd=False):
 
-        super(OffPolicyAC, self).__init__(model, gpu_id)
+        super(OffPolicyAC, self).__init__(
+            model, gpu_id, discount_factor, value_cost_weight,
+            prob_entropy_weight, optim, grad_clip, ntd)
         self.epsilon = epsilon
-        self.discount_factor = discount_factor
-        self.value_cost_weight = value_cost_weight
-        self.optim = optim[0](self.model.parameters(), **optim[1])
-        self.grad_clip = grad_clip
 
     def get_action_specs(self):
         ### "action_log_prob" is required by the algorithm but not by the model
@@ -272,8 +315,7 @@ class OffPolicyAC(Algorithm):
             ("action_log_prob", dict(shape=[1]))
         ]
 
-    def learn(self, inputs, next_inputs, states, next_states, next_alive,
-              actions, next_actions, rewards):
+    def _rl_learn(self, inputs, actions, next_values, rewards, states):
         """
         This learn() is expected to be called multiple times on each minibatch
         """
@@ -284,18 +326,12 @@ class OffPolicyAC(Algorithm):
 
         values, states_update = self.model.value(inputs, states)
         value = values["v_value"]
-
-        with torch.no_grad():
-            next_values, next_states_update = self.model.value(next_inputs,
-                                                               next_states)
-            next_value = next_values["v_value"] * torch.abs(next_alive[
-                "alive"])
-
+        next_value = next_values["v_value"]
         assert value.size() == next_value.size()
 
         critic_value = reward + self.discount_factor * next_value
         td_error = (critic_value - value).squeeze(-1)
-        value_cost = td_error**2
+        value_cost = self.value_cost_weight * td_error**2
 
         dist, _ = self.model.policy(inputs, states)
         dist = dist["action"]
@@ -313,17 +349,13 @@ class OffPolicyAC(Algorithm):
 
         pg_obj = torch.min(input=ratio * td_error.detach(),
                            other=clipped_ratio * td_error.detach())
-        cost = self.value_cost_weight * value_cost - pg_obj
+        entropy_cost = self.prob_entropy_weight * dist.entropy()
+        cost = value_cost - pg_obj - entropy_cost  ## increase entropy for exploration
 
-        avg_cost = comf.get_avg_cost(cost)
-        self.optim.zero_grad()
-        avg_cost.backward(retain_graph=True)
-        if self.grad_clip:
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(),
-                                           self.grad_clip)
-        self.optim.step()
-
-        return dict(cost=cost)
-
-    def predict(self, inputs, states):
-        return self._rl_predict(self.model, inputs, states)
+        sum_cost, _ = comf.sum_cost_tensor(cost)
+        sum_cost.backward(retain_graph=True)
+        return dict(cost=cost,
+                    pg_obj=pg_obj,
+                    value_cost=value_cost,
+                    entropy_cost=entropy_cost), \
+            states_update

@@ -10,23 +10,27 @@ class GymEnv(Env):
     environment interfaces.
     """
 
-    def __init__(self, game_name, contexts=1):
+    def __init__(self, game_name, show_frame=False, contexts=1):
         self.gym_env = gym.make(game_name)
         assert contexts >= 1, "contexts must be a positive number!"
         self.contexts = contexts
         self.buf = None
         self.steps = 0
+        self.show_frame = show_frame
+        self.input_key = "sensor"
+        self.action_key = "action"
+        self.reward_key = "reward"
 
     def reset(self):
         self.steps = 0
-        ## should return a list of observations
+        ## should return a dictionary of observations
         init_ob = self.preprocess_observation(self.gym_env.reset())
         self.buf = [np.zeros(init_ob.shape).astype(init_ob.dtype) \
                     for i in range(self.contexts - 1)]
         ## the newest state is the last element
         self.buf.append(init_ob)
         ## concat along the channel dimension
-        return [np.concatenate(self.buf)]
+        return {self.input_key: np.concatenate(self.buf)}
 
     def time_out(self):
         return self.steps >= self.gym_env._max_episode_steps - 1
@@ -36,28 +40,35 @@ class GymEnv(Env):
 
     def step(self, actions, actrep=1):
         """
-        Given a list of ordered actions, forward the environment one step.
-        The output should be a list of next observations, a list of rewards,
-        and the next game over.
+        Given a dictionary of actions, forward the environment one step.
+        The output should be a dictionary of next observations, a dictionary of
+        reward vectors (each vector for a kind), and the next game over.
         """
-        assert len(actions) == 1, "OpenAI Gym only accepts a single action!"
-        a = actions[0]
+        a = actions["action"]
         if "int" in str(a.dtype):
             a = a[0]  ## Gym accepts scalars for discrete actions
 
         total_reward = 0
+        ## The Gym games do not differentiate between 'success' and 'failure'
         next_game_over = False
         self.steps += 1
         for i in range(actrep):
             next_ob, reward, game_over, _ = self.gym_env.step(a)
             total_reward += reward
             next_game_over = next_game_over | game_over
+        if next_game_over:
+            next_game_over = -1  ## when True, assume a failure
 
         next_ob = self.preprocess_observation(next_ob)
         self.buf.append(next_ob)
         if len(self.buf) > self.contexts:
             self.buf.pop(0)
-        return [np.concatenate(self.buf)], [total_reward], next_game_over
+
+        if self.show_frame:
+            self.gym_env.render()
+
+        return {self.input_key : np.concatenate(self.buf)}, \
+            {self.reward_key : [total_reward]}, int(next_game_over)
 
     def preprocess_observation(self, ob):
         """
@@ -73,7 +84,7 @@ class GymEnv(Env):
         shape = self.gym_env.observation_space.shape
         ## only the first dim has several contexts
         ## Gym has a single input
-        return [(shape[0] * self.contexts, ) + shape[1:]]
+        return {self.input_key: (shape[0] * self.contexts, ) + shape[1:]}
 
     def action_dims(self):
         """
@@ -81,8 +92,8 @@ class GymEnv(Env):
         """
         act_space = self.gym_env.action_space
         if isinstance(act_space, gym.spaces.Discrete):
-            return [act_space.n]
-        return list(act_space.shape)
+            return {self.action_key: act_space.n}
+        return {self.action_key: act_space.shape[0]}
 
 
 class GymEnvImage(GymEnv):
@@ -92,8 +103,14 @@ class GymEnvImage(GymEnv):
     to a proper value range.
     """
 
-    def __init__(self, game_name, contexts=1, height=-1, width=-1, gray=False):
-        super(GymEnvImage, self).__init__(game_name, contexts)
+    def __init__(self,
+                 game_name,
+                 show_frame=False,
+                 contexts=1,
+                 height=-1,
+                 width=-1,
+                 gray=False):
+        super(GymEnvImage, self).__init__(game_name, show_frame, contexts)
         self.height = height
         self.width = width
         self.gray = gray
@@ -119,5 +136,5 @@ class GymEnvImage(GymEnv):
             d = 1
         d *= self.contexts
         if self.height > 0:
-            return [(d, self.height, self.width)]
-        return [(d, h, w)]
+            return {self.input_key: (d, self.height, self.width)}
+        return {self.input_key: (d, h, w)}

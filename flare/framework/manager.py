@@ -1,7 +1,7 @@
 from multiprocessing import Queue
 from threading import Thread
 from flare.framework.computation_task import ComputationTask
-from flare.common.logging import GameLogger
+from flare.common.log import GameLogger
 import signal
 import sys
 
@@ -16,9 +16,11 @@ class Manager(object):
         ## default settings
         log_settings_ = dict(
             print_interval=100,
+            load_model=False,
             model_dir="",
             pass_num=0,
-            model_save_interval=10)
+            model_save_interval=10,
+            log_file="")
         ## update with the user provided ones
         log_settings_.update(log_settings)
         log_settings = log_settings_
@@ -27,12 +29,14 @@ class Manager(object):
         self.logger = GameLogger(
             timeout=1,
             print_interval=log_settings["print_interval"],
-            model_save_interval=log_settings["model_save_interval"])
+            model_save_interval=log_settings["model_save_interval"],
+            log_file=log_settings["log_file"])
         self.cts = {}
         self.CDPs = {}
         for name, setting in ct_settings.iteritems():
             setting["model_dir"] = log_settings["model_dir"]
             setting["pass_num"] = log_settings["pass_num"]
+            setting["load_model"] = log_settings["load_model"]
             self.cts[name] = ComputationTask(name, **setting)
             self.CDPs[name] = self.cts[name].CDP
             self.logger.model_save_signals.append(self.cts[name]
@@ -51,6 +55,11 @@ class Manager(object):
         self.logger.running.value = False
         self.logger.join()
         sys.exit(0)
+
+    def add_agents(self, agents):
+        assert isinstance(agents, list)
+        for agent in agents:
+            self.add_agent(agent)
 
     def add_agent(self, agent):
         agent.id = len(self.agents)

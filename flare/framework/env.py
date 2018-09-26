@@ -16,23 +16,24 @@ class Env(object):
     @abstractmethod
     def reset(self):
         """
-        Reset the environment and return a list of initial observations
+        Reset the environment and return a dictionary of initial observations
         """
         pass
 
     @abstractmethod
     def step(self, actions, actrep):
         """
-        Given a list of ordered actions, forward the environment actrep step.
-        The output should be a list of next observations, a list of rewards,
-        and the next game over.
+        Given a dictionary of actions, forward the environment actrep step.
+        The output should be a dictionary of next observations, a dictionary of
+        reward vectors (each vector for a kind), and next_game_over which only has
+        three possible values: 0 alive, 1 success, -1 failure/dead
         """
         pass
 
     @abstractmethod
     def observation_dims(self):
         """
-        Return a list of tuples as observation dimensions, each tuple for one 
+        Return a dictionary of tuples as observation dimensions, each tuple for one
         observation.
         Each tuple contains the dimension numbers of that input.
         """
@@ -41,8 +42,8 @@ class Env(object):
     @abstractmethod
     def action_dims(self):
         """
-        Return a list of integers as action dimensions, each integer for an 
-        action. For each integer, if the corresponding action is discrete, 
+        Return a dictionary of integers as action dimensions, each integer for an
+        action. For each integer, if the corresponding action is discrete,
         then it means the total number of actions;
         if continous, then it means the length of the action vector.
         if language, then it means the cardinality of the dictionary
@@ -52,6 +53,6 @@ class Env(object):
     @abstractmethod
     def time_out(self):
         """
-        Return a boolean of whether the env has timed out 
+        Return a boolean of whether the env has timed out
         """
         pass

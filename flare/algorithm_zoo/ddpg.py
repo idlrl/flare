@@ -72,9 +72,9 @@ class ContinuousDeterministicModel(Model):
 
     def policy_optimizer(self, optim_specs):
         """
-        Specify the optimizer settings for policy network. `optim_specs` is a 
-        tuple of two items: `optim_specs[0]` is a optimizer object from 
-        `torch.optim`, and `optim_specs[1]` is a dict of arguments for 
+        Specify the optimizer settings for policy network. `optim_specs` is a
+        tuple of two items: `optim_specs[0]` is a optimizer object from
+        `torch.optim`, and `optim_specs[1]` is a dict of arguments for
         `optim_specs[0]`.
         """
         return optim_specs[0]([{
@@ -87,9 +87,9 @@ class ContinuousDeterministicModel(Model):
 
     def critic_optimizer(self, optim_specs):
         """
-        Specify the optimizer settings for critic network. `optim_specs` is a 
-        tuple of two items: `optim_specs[0]` is a optimizer object from 
-        `torch.optim`, and `optim_specs[1]` is a dict of arguments for 
+        Specify the optimizer settings for critic network. `optim_specs` is a
+        tuple of two items: `optim_specs[0]` is a optimizer object from
+        `torch.optim`, and `optim_specs[1]` is a dict of arguments for
         `optim_specs[0]`.
         """
         return optim_specs[0]([{
@@ -103,8 +103,7 @@ class ContinuousDeterministicModel(Model):
 
 class DDPG(Algorithm):
     """
-    DDPG impelmentation.
-
+    DDPG impelmentation. Currently no support for short-term memory.
     """
 
     def __init__(
@@ -165,14 +164,16 @@ class DDPG(Algorithm):
         assert q_value.size() == next_value.size()
 
         critic_value = reward + self.discount_factor * next_value
-        critic_loss = nn.MSELoss()(q_value, critic_value)
-        critic_loss.backward()
+        critic_loss = (q_value - critic_value).squeeze(-1)**2
+        sum_critic_loss, _ = comf.sum_cost_tensor(critic_loss)
+        sum_critic_loss.backward()
         self.critic_optim.step()
 
         self.policy_optim.zero_grad()
         values2, _ = self.model.value(inputs, states)
-        policy_loss = -values2["q_value"].mean()
-        policy_loss.backward()
+        policy_loss = -values2["q_value"].squeeze(-1)
+        sum_policy_loss, _ = comf.sum_cost_tensor(policy_loss)
+        sum_policy_loss.backward()
         self.policy_optim.step()
 
-        return dict(cost=critic_loss + policy_loss)
+        return dict(critic_loss=critic_loss, policy_loss=policy_loss)

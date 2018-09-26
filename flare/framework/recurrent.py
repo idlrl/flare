@@ -64,18 +64,18 @@ def transpose(hier_tensors):
 
 
 def recurrent_group(seq_inputs,
-                    insts,
-                    init_states,
                     step_func,
+                    insts=[],
+                    init_states=[],
                     out_states=False):
     """
     Strip a sequence level and apply the stripped inputs to `step_func`
     provided by the user.
 
     seq_inputs: collection of sequences, each being either a tensor or a list
+    step_func: the function applied to the stripped inputs
     insts: collection of static instances, each being a tensor
     init_states: collection of initial states, each being a tensor
-    step_func: the function applied to the stripped inputs
     out_states: if True, also output the hidden states produced in the process
     """
 
@@ -166,53 +166,35 @@ def recurrent_group(seq_inputs,
     return seq_outs
 
 
-def step_func(learn_func, lens, keys, *args):
-    ipts, nipts, nee, act, nact, rs, sts, nsts = split_list(list(args), lens)
-    ## We wrap each input into a dictionary because learn_func
-    ## is expected to receive dicts and output dicts
-    costs, sts_update, nsts_update = learn_func(
-        dict(zip(keys["inputs"], ipts)),
-        dict(zip(keys["next_inputs"], nipts)),
-        dict(zip(keys["states"], sts)),
-        dict(zip(keys["next_states"], nsts)),
-        dict(zip(keys["next_alive"], nee)),
-        dict(zip(keys["actions"], act)),
-        dict(zip(keys["next_actions"], nact)), dict(zip(keys["rewards"], rs)))
-    return costs.values(), \
-        [sts_update[k] for k in keys["states"]] + \
-        [nsts_update[k] for k in keys["states"]]
+class AgentRecurrentHelper(object):
+    """
+    This class provides a helper function "recurrent" to an agent which has
+    specific dict inputs and outputs in an RL setting. The idea is that the helper
+    strips the keys of the dicts, applies recurrent_group, and then wraps the keys
+    back to the outputs of recurrent_group.
+    """
 
+    def step_wrapper(self, *args):
+        splitted = split_list(list(args), self.lens)
+        recurrent_args = [dict(zip(k, s)) for k, s in zip(self.keys, splitted)]
+        ret = self.recurrent_step(*recurrent_args)
+        outputs = ret[0]
+        states_update = ret[1:]
+        self.outputs_keys = outputs.keys()
+        return outputs.values(), \
+            [s[k] for i,s in enumerate(states_update) for k in self.state_keys[i]]
 
-def call_recurrent_group(learn_step, inputs, next_inputs, states, next_states,
-                         next_alive, actions, next_actions, rewards):
-    assert (states)
-    # `lens` and `keys` are required by the step function
-    lens = [
-        len(inputs), len(next_inputs), len(next_alive), len(actions),
-        len(next_actions), len(rewards), len(states), len(next_states)
-    ]
-    keys = dict(
-        inputs=inputs.keys(),
-        next_inputs=next_inputs.keys(),
-        states=states.keys(),
-        next_states=next_states.keys(),
-        next_alive=next_alive.keys(),
-        actions=actions.keys(),
-        next_actions=next_actions.keys(),
-        rewards=rewards.keys())
-
-    # rc_out stores all outputs by recurrent_group
-    func = (lambda *args: step_func(learn_step, lens, keys, *args))
-    costs = recurrent_group(
-            seq_inputs=inputs.values() + \
-                       next_inputs.values() + \
-                       next_alive.values() + \
-                       actions.values() + \
-                       next_actions.values() + \
-                       rewards.values(),
-            init_states=states.values() + next_states.values(),
+    def recurrent(self, recurrent_step, input_dict_list, state_dict_list):
+        assert len(input_dict_list) > 0, "There should be at least one input!"
+        assert len(state_dict_list) > 0, "There should be at least one state!"
+        self.recurrent_step = recurrent_step
+        dict_list = input_dict_list + state_dict_list
+        self.lens = [len(d) for d in dict_list]
+        self.keys = [d.keys() for d in dict_list]
+        self.state_keys = [d.keys() for d in state_dict_list]
+        outputs = recurrent_group(
+            seq_inputs=[v for d in input_dict_list for v in d.values()],
+            init_states=[v for d in state_dict_list for v in d.values()],
             insts=[],
-            step_func=func)
-    # get cost terms from rc_out
-    costs = dict(zip(["cost"], costs))
-    return costs
+            step_func=self.step_wrapper)
+        return dict(zip(self.outputs_keys, outputs))
