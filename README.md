@@ -186,6 +186,7 @@ For advanced usage of FLARE, you might want to take a look at the documentation 
 * [Modules of FLARE](tutorial/modules.md)
 * [Agents with Short-term Memory](tutorial/memory.md)
 * [Link a Simulator to FLARE](tutorial/simulator.md)
+* [Tutorial: Learning to Perform Language-directed Tasks in a 3D Environment](tutorial/gft.md)
 
 ## License
 FLARE has the Apache 2.0 license.
