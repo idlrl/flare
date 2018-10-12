@@ -18,6 +18,8 @@ class GFT(nn.Module):
     """
     This class implements the GFT model proposed in the CoRL2018 paper:
     https://arxiv.org/pdf/1805.08329.pdf
+    
+    A tutorial is available at https://idlrl.github.io/flare/tutorial/gft.html
     """
 
     def __init__(self, K, vision_perception_net, language_perception_net,
