@@ -175,7 +175,7 @@ def __init__(self,
         nn.ReLU(), nn.Linear(self.hidden_size, 1))
 ```
 
-Even though we have sequential input data, because of `recurrent_group` as shown later in `SimpleAC`, all the model computations are performed in single time steps. As a result, we need to use RNN cells instead of entire RNNs. We implement a GRU cell with ReLU as used in the original paper (see [`common_functions.py`](https://github.com/idlrl/flare/blob/master/flare/framework/common_functions.py).
+Even though we have sequential input data, because of `recurrent_group` as shown later in `SimpleAC`, all the model computations are performed in single time steps. As a result, we need to use RNN cells instead of entire RNNs. We implement a GRU cell with ReLU as used in the original paper (see [`common_functions.py`](https://github.com/idlrl/flare/blob/master/flare/framework/common_functions.py`).
 ```python
 class GRUCellReLU(nn.Module):
     """
@@ -328,7 +328,7 @@ manager.start()
 ```
 
 ## Training results
-You can go ahead and directly run `<flare_root>/tutorial/examples/xworld3d_navigation.py` which contains the steps that have been went through in the above. The evaluated success rates of the first 200 passes (each pass contains 2k games from 26 agents in total) on the most difficult level (8x8 maps) are shown below. The curve is smoothed by a 7x7 uniform kernel for better visualization.
+You can go ahead and directly run [`xworld3d_navigation.py`](https://github.com/idlrl/flare/blob/master/tutorial/examples/xworld3d_navigation.py) which contains the steps that have been went through in the above. The evaluated success rates of the first 800 passes (each pass contains 2k games from 26 agents in total) on the most difficult level (8x8 maps) are shown below. The curve is smoothed by a 7x7 uniform kernel for better visualization.
 
 <p><img src="image/success.png" style="width:60%"></p>
 
