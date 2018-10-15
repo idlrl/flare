@@ -328,7 +328,7 @@ manager.start()
 ```
 
 ## Training results
-You can go ahead and directly run [`xworld3d_navigation.py`](https://github.com/idlrl/flare/blob/master/tutorial/examples/xworld3d_navigation.py) which contains the steps that have been went through in the above. The evaluated success rates of the first 800 passes (each pass contains 2k games from 26 agents in total) on the most difficult level (8x8 maps) are shown below. The curve is smoothed by a 7x7 uniform kernel for better visualization.
+You can go ahead and directly run [`xworld3d_navigation.py`](https://github.com/idlrl/flare/blob/master/tutorial/examples/xworld3d_navigation.py) which contains the steps that have been went through in the above. The evaluated success rates of every 10 passes (each pass contains 2k games from 26 agents in total) for the first 800 passes on the most difficult level (8x8 maps) are shown below. The curve is smoothed by a 7x7 uniform kernel for better visualization.
 
 <p><img src="image/success.png" style="width:60%"></p>
 
