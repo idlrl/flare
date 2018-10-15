@@ -80,6 +80,28 @@ class Flatten(nn.Module):
         return x
 
 
+class GRUCellReLU(nn.Module):
+    """
+    A self-implemented GRUCell with ReLU activation support
+    """
+
+    def __init__(self, input_size, hidden_size):
+        super(GRUCellReLU, self).__init__()
+        self.r_fc = nn.Linear(input_size + hidden_size, hidden_size)
+        self.z_fc = nn.Linear(input_size + hidden_size, hidden_size)
+        self.in_fc = nn.Linear(input_size, hidden_size)
+        self.hn_fc = nn.Linear(hidden_size, hidden_size)
+        self.hidden_size = hidden_size
+
+    def forward(self, input, hx=None):
+        # if hx is None:
+        #     hx = input.new_zeros(input.size(0), self.hidden_size, requires_grad=False)
+        r = torch.sigmoid(self.r_fc(torch.cat((input, hx), dim=-1)))
+        z = torch.sigmoid(self.z_fc(torch.cat((input, hx), dim=-1)))
+        n = torch.relu(self.in_fc(input) + r * self.hn_fc(hx))
+        return (1 - z) * n + z * hx
+
+
 class BoW(nn.Module):
     """
     Convert a sentence to a compact BoW embedding.

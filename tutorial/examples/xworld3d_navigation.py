@@ -3,7 +3,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
 from torch.distributions import Categorical
 from flare.framework.algorithm import Model
 from flare.algorithm_zoo.simple_algorithms import SimpleAC
@@ -11,7 +10,7 @@ from flare.framework.manager import Manager
 from flare.agent_zoo.simple_rl_agents import SimpleRNNRLAgent
 from flare.framework.agent import OnlineHelper
 from flare.env_zoo.xworld import XWorldEnv
-from flare.framework.common_functions import BoW, Flatten
+from flare.framework.common_functions import BoW, Flatten, GRUCellReLU
 
 
 class GFT(nn.Module):
@@ -50,7 +49,7 @@ class GFT(nn.Module):
         for t in ts:
             assert t.size()[0] == cnn_out.size()[0]
             cnn_out = torch.cat((cnn_out, ones), dim=1)
-            cnn_out = F.relu(torch.matmul(t, cnn_out))
+            cnn_out = torch.relu(torch.matmul(t, cnn_out))
         return self.hidden_net(cnn_out)
 
 
@@ -70,12 +69,9 @@ class GFTModelAC(Model):
                        hidden_net)
         ## Two-layer RNN
         self.action_embedding = nn.Embedding(num_actions, self.hidden_size / 2)
-        self.h_m_cell = nn.RNNCell(
-            self.hidden_size, self.hidden_size, nonlinearity='relu')
-        self.h_a_cell = nn.RNNCell(
-            self.hidden_size / 2, self.hidden_size / 2, nonlinearity='relu')
-        self.f_cell = nn.RNNCell(
-            self.hidden_size, self.hidden_size, nonlinearity='relu')
+        self.h_m_cell = GRUCellReLU(self.hidden_size, self.hidden_size)
+        self.h_a_cell = GRUCellReLU(self.hidden_size / 2, self.hidden_size / 2)
+        self.f_cell = GRUCellReLU(self.hidden_size, self.hidden_size)
         self.fc = nn.Sequential(
             nn.Linear(int(1.5 * self.hidden_size), self.hidden_size),
             nn.ReLU())

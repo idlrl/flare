@@ -28,7 +28,7 @@ In order for the agent to correctly navigate, it has to learn to ground language
 <p><img src="image/gft_overview.png" style="width:80%"></p>
 
 ## Step-by-step implementation
-All the code in this section is contained in a single file `<flare_root>/tutorial/examples/xworld3d_navigation.py`. Before start, you need to install [XWorld3D](https://github.com/PaddlePaddle/XWorld) and add it in your Python paths.
+All the code in this section, without explicitly mentioned, is contained in a single file [`xworld3d_navigation.py`](https://github.com/idlrl/flare/blob/master/tutorial/examples/xworld3d_navigation.py). Before start, you need to install [XWorld3D](https://github.com/PaddlePaddle/XWorld) and add it in your Python paths.
 
 #### Environment setup
 We first outline the main function. We will run 26 agents in parallel, each agent running for an enough long time until we stop it. The environment is configured with image sizes of 84x84 and a curriculum threshold of 0.7. Once an agent achieves a success rate greather than the threshold, it enters the next level with more complex maps (curriculum schedule in Appendix D). The map and task configurations are provided by a JSON file `walls3d.json`. To create XWorld3D environments, we need to provide a dictionary `dict.txt`. Finally, we obtain some dimension numbers for creating the agents.
@@ -159,12 +159,9 @@ def __init__(self,
                    hidden_net)
     ## Two-layer RNN
     self.action_embedding = nn.Embedding(num_actions, self.hidden_size / 2)
-    self.h_m_cell = nn.RNNCell(
-        self.hidden_size, self.hidden_size, nonlinearity='relu')
-    self.h_a_cell = nn.RNNCell(
-        self.hidden_size / 2, self.hidden_size / 2, nonlinearity='relu')
-    self.f_cell = nn.RNNCell(
-        self.hidden_size, self.hidden_size, nonlinearity='relu')
+    self.h_m_cell = GRUCellReLU(self.hidden_size, self.hidden_size)
+    self.h_a_cell = GRUCellReLU(self.hidden_size / 2, self.hidden_size / 2)
+    self.f_cell = GRUCellReLU(self.hidden_size, self.hidden_size)
     self.fc = nn.Sequential(
         nn.Linear(int(1.5 * self.hidden_size), self.hidden_size),
         nn.ReLU())
@@ -177,7 +174,30 @@ def __init__(self,
         nn.Linear(self.hidden_size, self.hidden_size),
         nn.ReLU(), nn.Linear(self.hidden_size, 1))
 ```
-Even though we have sequential input data, because of `recurrent_group` as shown later in `SimpleAC`, all the model computations are performed in single time steps. As a result, we need to use RNN cells instead of entire RNNs. Here we use plain RNNs instead of GRUs as in the original paper because currently PyTorch only supports Tanh for `GRUCell`.
+
+Even though we have sequential input data, because of `recurrent_group` as shown later in `SimpleAC`, all the model computations are performed in single time steps. As a result, we need to use RNN cells instead of entire RNNs. We implement a GRU cell with ReLU as used in the original paper (see [`common_functions.py`](https://github.com/idlrl/flare/blob/master/flare/framework/common_functions.py).
+```python
+class GRUCellReLU(nn.Module):
+    """
+    A self-implemented GRUCell with ReLU activation support
+    """
+
+    def __init__(self, input_size, hidden_size):
+        super(GRUCellReLU, self).__init__()
+        self.r_fc = nn.Linear(input_size + hidden_size, hidden_size)
+        self.z_fc = nn.Linear(input_size + hidden_size, hidden_size)
+        self.in_fc = nn.Linear(input_size, hidden_size)
+        self.hn_fc = nn.Linear(hidden_size, hidden_size)
+        self.hidden_size = hidden_size
+
+    def forward(self, input, hx=None):
+        # if hx is None:
+        #     hx = input.new_zeros(input.size(0), self.hidden_size, requires_grad=False)
+        r = torch.sigmoid(self.r_fc(torch.cat((input, hx), dim=-1)))
+        z = torch.sigmoid(self.z_fc(torch.cat((input, hx), dim=-1)))
+        n = torch.relu(self.in_fc(input) + r * self.hn_fc(hx))
+        return (1 - z) * n + z * hx
+```
 
 Let us skip the definition of `GFT` for a moment. Suppose that `self.gft` fuses language and vision and outputs a compact grounded result. Given the three RNN cells, we are able to compute the final feature representation `f_` for computing the policy and value:
 ```python
@@ -308,7 +328,7 @@ manager.start()
 ```
 
 ## Training results
-You can go ahead and directly run `<flare_root>/tutorial/examples/xworld3d_navigation.py` which contains the steps that have been went through in the above. The evaluated success rates of the first 200 passes (each pass contains 2k games from 26 agents in total) on the most difficult level (8x8 maps) are shown below. The curve is smoothed by a 7x7 uniform kernel for better visualization.
+You can go ahead and directly run [`xworld3d_navigation.py`](https://github.com/idlrl/flare/blob/master/tutorial/examples/xworld3d_navigation.py) which contains the steps that have been went through in the above. The evaluated success rates of the first 800 passes (each pass contains 2k games from 26 agents in total) on the most difficult level (8x8 maps) are shown below. The curve is smoothed by a 7x7 uniform kernel for better visualization.
 
 <p><img src="image/success.png" style="width:60%"></p>
 
