@@ -175,7 +175,7 @@ def __init__(self,
         nn.ReLU(), nn.Linear(self.hidden_size, 1))
 ```
 
-Even though we have sequential input data, because of `recurrent_group` as shown later in `SimpleAC`, all the model computations are performed in single time steps. As a result, we need to use RNN cells instead of entire RNNs. We implement a GRU cell with ReLU as used in the original paper (see [`common_functions.py`](https://github.com/idlrl/flare/blob/master/flare/framework/common_functions.py`).
+Even though we have sequential input data, because of `recurrent_group` as shown later in `SimpleAC`, all the model computations are performed in single time steps. As a result, we need to use RNN cells instead of entire RNNs. We implement a GRU cell with ReLU as used in the original paper (see [`common_functions.py`](https://github.com/idlrl/flare/blob/master/flare/framework/common_functions.py).
 ```python
 class GRUCellReLU(nn.Module):
     """
