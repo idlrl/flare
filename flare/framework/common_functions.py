@@ -98,7 +98,7 @@ class GRUCellReLU(nn.Module):
         #     hx = input.new_zeros(input.size(0), self.hidden_size, requires_grad=False)
         r = torch.sigmoid(self.r_fc(torch.cat((input, hx), dim=-1)))
         z = torch.sigmoid(self.z_fc(torch.cat((input, hx), dim=-1)))
-        n = torch.relu(self.in_fc(input) + r * self.hn_fc(hx))
+        n = torch.relu(self.in_fc(input) + self.hn_fc(r * hx))
         return (1 - z) * n + z * hx
 
 
