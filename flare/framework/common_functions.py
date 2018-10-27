@@ -94,6 +94,9 @@ class GRUCellReLU(nn.Module):
         self.hidden_size = hidden_size
 
     def forward(self, input, hx=None):
+        """
+        Formulas from https://en.wikipedia.org/wiki/Gated_recurrent_unit
+        """
         # if hx is None:
         #     hx = input.new_zeros(input.size(0), self.hidden_size, requires_grad=False)
         r = torch.sigmoid(self.r_fc(torch.cat((input, hx), dim=-1)))
