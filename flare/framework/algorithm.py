@@ -96,7 +96,6 @@ class Algorithm(object):
         are performed on every sampled batch.
         Only set it greater than 1 if you are aware of off-policy training.
         """
-        assert isinstance(model, Model)
         check_duplicate_spec_names(model)
         self.model = model
         if torch.cuda.is_available() and gpu_id >= 0:

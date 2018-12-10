@@ -15,7 +15,7 @@ if __name__ == '__main__':
     """
     game = "Assault-v0"
 
-    num_agents = 1
+    num_agents = 16
     num_games = 8000
 
     im_height, im_width = 84, 84
