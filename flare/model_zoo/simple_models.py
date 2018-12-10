@@ -20,7 +20,7 @@ class SimpleModelDeterministic(Model):
         return [("action", dict(shape=self.dims))]
 
     def policy(self, inputs, states):
-        hidden = self.perception_net(inputs.values()[0])
+        hidden = self.perception_net(list(inputs.values())[0])
         return dict(action=Deterministic(hidden)), states
 
 
@@ -44,11 +44,11 @@ class SimpleModelAC(Model):
         return [("action", dict(shape=[1], dtype="int64"))]
 
     def policy(self, inputs, states):
-        dist = Categorical(probs=self.policy_net(inputs.values()[0]))
+        dist = Categorical(probs=self.policy_net(list(inputs.values())[0]))
         return dict(action=dist), states
 
     def value(self, inputs, states):
-        return dict(v_value=self.value_net(inputs.values()[0])), states
+        return dict(v_value=self.value_net(list(inputs.values())[0])), states
 
 
 class SimpleModelQ(Model):
@@ -73,7 +73,7 @@ class SimpleModelQ(Model):
         return dict(action=comf.q_categorical(q_value)), states
 
     def value(self, inputs, states):
-        return dict(q_value=self.value_net(inputs.values()[0])), states
+        return dict(q_value=self.value_net(list(inputs.values())[0])), states
 
 
 class SimpleRNNModelAC(Model):
@@ -102,14 +102,14 @@ class SimpleRNNModelAC(Model):
         return [("state", dict(shape=[self.hidden_size]))]
 
     def policy(self, inputs, states):
-        hidden = self.hidden_layers(inputs.values()[0])
-        next_state = self.recurrent(hidden, states.values()[0])
+        hidden = self.hidden_layers(list(inputs.values())[0])
+        next_state = self.recurrent(hidden, list(states.values())[0])
         dist = Categorical(probs=self.policy_layers(next_state))
         return dict(action=dist), dict(state=next_state)
 
     def value(self, inputs, states):
-        hidden = self.hidden_layers(inputs.values()[0])
-        next_state = self.recurrent(hidden, states.values()[0])
+        hidden = self.hidden_layers(list(inputs.values())[0])
+        next_state = self.recurrent(hidden, list(states.values())[0])
         return dict(v_value=self.value_layer(next_state)), dict(
             state=next_state)
 
@@ -143,8 +143,8 @@ class SimpleRNNModelQ(Model):
         return dict(action=comf.q_categorical(q_value)), next_states
 
     def value(self, inputs, states):
-        hidden = self.hidden_layers(inputs.values()[0])
-        next_state = self.recurrent(hidden, states.values()[0])
+        hidden = self.hidden_layers(list(inputs.values())[0])
+        next_state = self.recurrent(hidden, list(states.values())[0])
         return dict(q_value=self.value_layer(next_state)), dict(
             state=next_state)
 
@@ -170,9 +170,9 @@ class GaussianPolicyModel(Model):
 
     def policy(self, inputs, states):
         dist = MultivariateNormal(
-            loc=self.policy_net(inputs.values()[0]),
+            loc=self.policy_net(list(inputs.values())[0]),
             covariance_matrix=torch.eye(self.action_dims) * self.std)
         return dict(action=dist), states
 
     def value(self, inputs, states):
-        return dict(v_value=self.value_net(inputs.values()[0])), states
+        return dict(v_value=self.value_net(list(inputs.values())[0])), states

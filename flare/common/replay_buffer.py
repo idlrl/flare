@@ -80,7 +80,7 @@ class ReplayBuffer(object):
     def sample(self, num_experiences, num_seqs=0):
         """
         If num_seqs > 0, generate a batch of sequences of experiences.
-        Each sequence has a length of int(num_experiences / num_seqs).
+        Each sequence has a length of num_experiences // num_seqs.
         A sequence must not cross the boundary between two games.
         If num_seqs == 0, generate a batch of individual experiences.
         """
@@ -90,14 +90,14 @@ class ReplayBuffer(object):
 
         if num_seqs == 0:
             num_seqs = num_experiences
-        for _ in xrange(num_seqs):
+        for _ in range(num_seqs):
             while True:
                 idx = np.random.randint(0, len(self.buffer) - 1)
                 if not self.buffer_end(idx) and not self.buffer[
                         idx].is_episode_end():
                     break
             indices = [idx]
-            for i in range(num_experiences / num_seqs):
+            for i in range(num_experiences // num_seqs):
                 if self.buffer_end(idx) or self.buffer[idx].is_episode_end():
                     break
                 idx = self.next_idx(idx)

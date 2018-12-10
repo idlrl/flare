@@ -1,5 +1,6 @@
 import torch.nn as nn
 import numpy as np
+import torch.optim as optim
 from flare.algorithm_zoo.simple_algorithms import SimpleQ
 from flare.model_zoo.simple_models import SimpleModelQ
 from flare.framework.manager import Manager
@@ -58,7 +59,9 @@ if __name__ == '__main__':
         model=SimpleModelQ(
             dims=(d, h, w), num_actions=num_actions, perception_net=cnn),
         gpu_id=0,
-        exploration_end_steps=500000 / num_agents,
+        optim=(optim.RMSprop, dict(lr=1e-4)),
+        grad_clip=5.0,
+        exploration_end_steps=500000 // num_agents,
         update_ref_interval=100)
 
     # 3. Specify the settings for learning: data sampling strategy
@@ -67,11 +70,10 @@ if __name__ == '__main__':
     ct_settings = {
         "RL": dict(
             num_agents=num_agents,
-            algorithm=alg,
-            hyperparas=dict(grad_clip=5.0),
+            alg=alg,
             # sampling
             agent_helper=ExpReplayHelper,
-            buffer_capacity=200000 / num_agents,
+            buffer_capacity=200000 // num_agents,
             num_experiences=4,  # num per agent
             num_seqs=0,  # sample instances
             sample_interval=5)

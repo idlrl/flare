@@ -49,7 +49,7 @@ if __name__ == '__main__':
     # settings used by ComputationTask.
     ct_settings = {
         "RL": dict(
-            algorithm=alg,
+            alg=alg,
             # sampling
             agent_helper=OnlineHelper,
             sample_interval=8,

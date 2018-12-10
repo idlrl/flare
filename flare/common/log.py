@@ -2,7 +2,7 @@ import logging
 import sys
 from collections import deque
 from multiprocessing import Queue, Process, Value
-from Queue import Empty, Full
+from queue import Empty, Full
 
 
 class Statistics(object):
@@ -83,7 +83,7 @@ class GameLogger(Process):
         self.daemon = True
 
     def __flush_log(self):
-        for alg_name, stats in self.stats.iteritems():
+        for alg_name, stats in self.stats.items():
             logging.info('\n{0}:{1}'.format(alg_name, stats))
 
     def __save_models(self, idx):
@@ -103,7 +103,7 @@ class GameLogger(Process):
                                ) == 0:
                 ## No matter which pass is loaded, the model will be saved starting
                 ## from pass 1
-                self.__save_models(self.counter / self.print_interval /
+                self.__save_models(self.counter // self.print_interval //
                                    self.model_save_interval)
 
     def run(self):

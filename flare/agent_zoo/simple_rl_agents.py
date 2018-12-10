@@ -36,7 +36,7 @@ class SimpleRLAgent(Agent):
             ## If not None, _store_data calls learn() in this iteration
             ## We return the cost for logging
             cost, learn_info = ret
-            return {k: comf.sum_cost_array(v)[0] for k, v in cost.iteritems()}
+            return {k: comf.sum_cost_array(v)[0] for k, v in cost.items()}
 
     def _cts_predict(self, observations, states):
         return self.predict('RL', observations, states)

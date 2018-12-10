@@ -30,7 +30,7 @@ class ActionNoiseAgent(SimpleRLAgent):
         assert len(actions) == 1
         actions = {
             k: a + self.action_noise.noise()
-            for k, a in actions.iteritems()
+            for k, a in actions.items()
         }
         return actions, dict()
 
@@ -79,11 +79,11 @@ if __name__ == '__main__':
     ct_settings = {
         "RL": dict(
             num_agents=num_agents,
-            algorithm=alg,
+            alg=alg,
             show_para_every_backwards=500,
             # sampling
             agent_helper=ExpReplayHelper,
-            buffer_capacity=1000000 / num_agents,
+            buffer_capacity=1000000 // num_agents,
             num_experiences=64,
             sample_interval=8,
             num_seqs=0)

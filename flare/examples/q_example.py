@@ -1,12 +1,12 @@
 from random import randint
 import torch.nn as nn
-import torch.optim as optim
 from flare.algorithm_zoo.simple_algorithms import SimpleQ
 from flare.framework.manager import Manager
 from flare.model_zoo.simple_models import SimpleModelQ
 from flare.framework.agent import ExpReplayHelper
 from flare.env_zoo.gym_env import GymEnv
 from flare.agent_zoo.simple_rl_agents import SimpleRLAgent
+
 
 if __name__ == '__main__':
     """
@@ -43,7 +43,7 @@ if __name__ == '__main__':
     alg = SimpleQ(
         model=SimpleModelQ(
             dims=state_shape, num_actions=num_actions, perception_net=mlp),
-        exploration_end_steps=500000 / num_agents,
+        exploration_end_steps=500000 // num_agents,
         update_ref_interval=100)
 
     # 3. Specify the settings for learning: the algorithm to use (SimpleAC
@@ -52,10 +52,10 @@ if __name__ == '__main__':
     ct_settings = {
         "RL": dict(
             num_agents=num_agents,
-            algorithm=alg,
+            alg=alg,
             # sampling
             agent_helper=ExpReplayHelper,
-            buffer_capacity=200000 / num_agents,
+            buffer_capacity=200000 // num_agents,
             num_experiences=4,  # num per agent
             num_seqs=0,  # sample instances
             sample_interval=8)

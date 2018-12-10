@@ -1,5 +1,5 @@
 from multiprocessing import Queue
-from Queue import Empty, Full
+from queue import Empty, Full
 from threading import Thread, Lock
 from flare.common.communicator import CTCommunicator, AgentCommunicator
 from flare.common.utils import concat_dicts, split_dict
@@ -37,7 +37,7 @@ class ComputationDataProcessor(object):
         for size in sizes:
             starts.append(size + starts[-1])
         batch = {}
-        for k in data[0].iterkeys():
+        for k in data[0].keys():
             batch[k] = concat_dicts((d[k] for d in data))
 
         return batch, starts
@@ -55,7 +55,7 @@ class ComputationDataProcessor(object):
             assert not ret or len(ret[-1]) == len(dict_list)
             ret.append(dict_list)
 
-        return zip(*ret)
+        return list(zip(*ret))
 
     def create_agent_helper(self, agent_id):
         comm = self.__create_communicator(agent_id)

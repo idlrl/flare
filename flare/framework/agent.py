@@ -273,13 +273,13 @@ class Agent(Process):
         ## and prediction data. These two functions assume that data are stored
         ## as mini batches instead of single instances in the prediction and learning
         ## queues.
-        inputs_ = {k: [v] for k, v in inputs.iteritems()}
-        states_ = {k: [v] for k, v in states.iteritems()}
+        inputs_ = {k: [v] for k, v in inputs.items()}
+        states_ = {k: [v] for k, v in states.items()}
         prediction, next_states = self.helpers[alg_name].predict(inputs_,
                                                                  states_)
         ## convert back to single instances
-        prediction = {k: v[0] for k, v in prediction.iteritems()}
-        next_states = {k: v[0] for k, v in next_states.iteritems()}
+        prediction = {k: v[0] for k, v in prediction.items()}
+        next_states = {k: v[0] for k, v in next_states.items()}
         return prediction, next_states
 
     def run(self):
@@ -306,7 +306,7 @@ class Agent(Process):
             learning_ret = self._cts_store_data(observations, actions, states,
                                                 rewards)  ## written by user
             if learning_ret is not None:
-                for k, v in learning_ret.iteritems():
+                for k, v in learning_ret.items():
                     self.log_entry.add_key(k, v)
 
         observations = self._reset_env()
@@ -333,7 +333,7 @@ class Agent(Process):
         if self.env.time_out():
             self.alive = -1
         actions, _ = self._cts_predict(observations, states)
-        zero_rewards = {k: [0] * len(v) for k, v in rewards.iteritems()}
+        zero_rewards = {k: [0] * len(v) for k, v in rewards.items()}
         __store_data(observations, actions, states, zero_rewards)
 
         ## Record success. For games that do not have a defintion of

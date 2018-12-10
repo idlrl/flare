@@ -36,9 +36,9 @@ class SimpleAlgorithm(Algorithm):
 
             if self.ntd:  ## we need sequential information for n-step TD
                 rewards = {k : comf.prepare_ntd_reward(r, self.discount_factor) \
-                           for k, r in rewards.iteritems()}
+                           for k, r in rewards.items()}
                 next_values = {k : comf.prepare_ntd_value(v, self.discount_factor) \
-                               for k, v in next_values.iteritems()}
+                               for k, v in next_values.items()}
 
             ## costs will preserve the sequential information!
             costs = self.recurrent_helper.recurrent(
@@ -145,7 +145,7 @@ class SimpleAC(SimpleAlgorithm):
             next_values, next_states_update = self.model.value(next_inputs,
                                                                next_states)
             next_values = {k : v * torch.abs(next_alive["alive"]) \
-                           for k, v in next_values.iteritems()}
+                           for k, v in next_values.items()}
         return next_values, next_states_update
 
 
@@ -190,7 +190,7 @@ class SimpleQ(SimpleAlgorithm):
         """
         distributions, states = self.model.policy(inputs, states)
         actions = {}
-        for key, dist in distributions.iteritems():
+        for key, dist in distributions.items():
             assert isinstance(dist, Categorical)
             if np.random.uniform(0, 1) < self.exploration_rate:
                 ## if to explore, we generate a uniform categorical distribution
@@ -234,7 +234,7 @@ class SimpleQ(SimpleAlgorithm):
             next_values, next_states_update = self.ref_model.value(next_inputs,
                                                                    next_states)
             next_values = {k : (q * torch.abs(next_alive["alive"])).max(-1)[0].unsqueeze(-1) \
-                           for k, q in next_values.iteritems()}
+                           for k, q in next_values.items()}
         return next_values, next_states_update
 
 
@@ -266,7 +266,7 @@ class SimpleSARSA(SimpleQ):
             next_values, next_states_update = self.model.value(next_inputs,
                                                                next_states)
             next_values = {k : comf.idx_select(q * torch.abs(next_alive["alive"]), next_action) \
-                           for k, q in next_values.iteritems()}
+                           for k, q in next_values.items()}
         return next_values, next_states_update
 
     def _rl_learn(self, inputs, actions, next_values, rewards, states):
