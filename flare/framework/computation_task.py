@@ -23,21 +23,20 @@ class ComputationTask(object):
 
     def __init__(self,
                  name,
-                 algorithm,
+                 alg,
                  show_para_every_backwards=0,
                  load_model=False,
                  model_dir="",
                  pass_num=0,
                  **kwargs):
 
-        assert isinstance(algorithm, Algorithm)
         self.name = name
         if model_dir == "":
             self.model_dir = ""
         else:
             os.system("mkdir -p " + model_dir)
             self.model_dir = model_dir
-        self.alg = algorithm
+        self.alg = alg
         self.show_para_every_backwards = show_para_every_backwards
         self._cdp_args = kwargs
         self._cdp = None
@@ -118,7 +117,7 @@ class ComputationTask(object):
 
         return {
             name: numpy_recursion(t)
-            for name, t in tensors_dict.iteritems()
+            for name, t in tensors_dict.items()
         }
 
     def predict(self, inputs, states=None):
@@ -178,17 +177,17 @@ class ComputationTask(object):
             self.backwards += 1
             if self.show_para_every_backwards \
                and self.backwards % self.show_para_every_backwards == 0:
-                print "=== Parameter staticis for CT[%s] - START ===" % self.name
+                print("=== Parameter staticis for CT[%s] - START ===" % self.name)
                 for name, para in self.alg.model.named_parameters():
                     min_val = float(torch.min(para))
                     max_val = float(torch.max(para))
                     min_grad = float(torch.min(para.grad.data))
                     max_grad = float(torch.max(para.grad.data))
-                    print name.ljust(50) \
+                    print(name.ljust(50) \
                         + ("min_val: %f" % min_val).ljust(30) \
                         + ("max_val: %f" % max_val).ljust(30) \
                         + ("min_grad: %f" % min_grad).ljust(30) \
-                        + ("max_grad: %f" % max_grad).ljust(30)
-                print "=== Parameter staticis for CT[%s] - END ===" % self.name
+                        + ("max_grad: %f" % max_grad).ljust(30))
+                print("=== Parameter staticis for CT[%s] - END ===" % self.name)
 
         return self._retrieve_np_arrays(costs), dict()

@@ -48,7 +48,7 @@ if __name__ == '__main__':
     # ComputationTask.
     ct_settings = {
         "RL": dict(
-            algorithm=alg,
+            alg=alg,
             # sampling
             agent_helper=OnlineHelper,
             # each agent will call `learn()` every `sample_interval` steps

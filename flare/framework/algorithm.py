@@ -145,7 +145,7 @@ class Algorithm(object):
         """
         distributions, states = behavior_model.policy(inputs, states)
         actions = {}
-        for key, dist in distributions.iteritems():
+        for key, dist in distributions.items():
             actions[key] = dist.sample()
             prob_key = key + "_log_prob"
             actions[prob_key] = dist.log_prob(actions[key]).unsqueeze(-1)

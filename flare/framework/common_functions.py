@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.distributions import Categorical
 import operator
+from functools import reduce
 import flare.framework.recurrent as rc
 
 

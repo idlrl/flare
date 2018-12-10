@@ -33,7 +33,7 @@ class Manager(object):
             log_file=log_settings["log_file"])
         self.cts = {}
         self.CDPs = {}
-        for name, setting in ct_settings.iteritems():
+        for name, setting in ct_settings.items():
             setting["model_dir"] = log_settings["model_dir"]
             setting["pass_num"] = log_settings["pass_num"]
             setting["load_model"] = log_settings["load_model"]
@@ -45,7 +45,7 @@ class Manager(object):
     def __signal_handler(self, sig, frame):
         # this is still not good, as we don't get a chance to normally stop
         # the processes.
-        print "user signaled ctrl+c"
+        print("user signaled ctrl+c")
         for cdp in self.CDPs.values():
             cdp.stop()
         for agent in self.agents:
@@ -66,9 +66,9 @@ class Manager(object):
         # `Agent` needs to know the state specs to prepare state data
         agent.cts_state_specs = \
             {k: v.get_state_specs()
-             for k, v in self.cts.iteritems()}
+             for k, v in self.cts.items()}
         self.agents.append(agent)
-        for name, cdp in self.CDPs.iteritems():
+        for name, cdp in self.CDPs.items():
             agent.add_agent_helper(
                 cdp.create_agent_helper(agent.id),
                 [s[0] for s in self.cts[name].get_input_specs()],

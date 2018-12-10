@@ -18,17 +18,17 @@ def c51(cnn, dims, num_actions, num_agents):
     alg = C51(model=C51Model(
         dims=dims, num_actions=num_actions, perception_net=cnn),
               gpu_id=0,
-              exploration_end_steps=500000 / num_agents,
+              exploration_end_steps=500000 // num_agents,
               update_ref_interval=100,
               grad_clip=5.0)
 
     ct_settings = {
         "RL": dict(
             num_agents=num_agents,
-            algorithm=alg,
+            alg=alg,
             # sampling
             agent_helper=ExpReplayHelper,
-            buffer_capacity=200000 / num_agents,
+            buffer_capacity=200000 // num_agents,
             num_experiences=4,  # num per agent
             num_seqs=0,  # sample instances
             sample_interval=5)
@@ -41,17 +41,17 @@ def rqdqn(cnn, dims, num_actions, num_agents):
         model=QRDQNModel(
             dims=dims, num_actions=num_actions, perception_net=cnn),
         gpu_id=0,
-        exploration_end_steps=500000 / num_agents,
+        exploration_end_steps=500000 // num_agents,
         update_ref_interval=100,
         grad_clip=5.0)
 
     ct_settings = {
         "RL": dict(
             num_agents=num_agents,
-            algorithm=alg,
+            alg=alg,
             # sampling
             agent_helper=ExpReplayHelper,
-            buffer_capacity=200000 / num_agents,
+            buffer_capacity=200000 // num_agents,
             num_experiences=4,  # num per agent
             num_seqs=0,  # sample instances
             sample_interval=5)
@@ -63,17 +63,17 @@ def iqn(cnn, dims, num_actions, num_agents):
     alg = IQN(model=IQNModel(
         dims=dims, num_actions=num_actions, perception_net=cnn),
               gpu_id=0,
-              exploration_end_steps=500000 / num_agents,
+              exploration_end_steps=500000 // num_agents,
               update_ref_interval=100,
               grad_clip=5.0)
 
     ct_settings = {
         "RL": dict(
             num_agents=num_agents,
-            algorithm=alg,
+            alg=alg,
             # sampling
             agent_helper=ExpReplayHelper,
-            buffer_capacity=200000 / num_agents,
+            buffer_capacity=200000 // num_agents,
             num_experiences=4,  # num per agent
             num_seqs=0,  # sample instances
             sample_interval=5)

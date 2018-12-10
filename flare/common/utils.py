@@ -26,7 +26,7 @@ def concat_dicts(dict_list):
         if not D:
             D = deepcopy(d)
         else:
-            assert (d.viewkeys() == D.viewkeys())
+            assert (set(d.keys()) == set(D.keys()))
             for k in D:
                 assert isinstance(d[k], type(D[k]))
                 if type(d[k]) == list:
@@ -46,7 +46,7 @@ def split_dict(D, starts):
     ret = []
     for i in range(len(starts) - 1):
         d = {}
-        for k, v in D.iteritems():
+        for k, v in D.items():
             d[k] = deepcopy(v[starts[i]:starts[i + 1]])
         ret.append(d)
     return ret
