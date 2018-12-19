@@ -1,5 +1,6 @@
 import logging
 import sys
+import copy
 from collections import deque
 from multiprocessing import Queue, Process, Value
 from queue import Empty, Full
@@ -79,12 +80,14 @@ class GameLogger(Process):
         self.stats = {}
         self.running = Value('i', 0)
         self.log_q = Queue()
+        self.stats_q = Queue()
         self.counter = 0
         self.daemon = True
 
     def __flush_log(self):
         for alg_name, stats in self.stats.items():
             logging.info('\n{0}:{1}'.format(alg_name, stats))
+        self.stats_q.put(copy.deepcopy(self.stats))
 
     def __save_models(self, idx):
         ## When agent.learning=False, this will not save models
