@@ -12,10 +12,9 @@ class ComputationDataProcessor(object):
     splits the batched results and sends them back to AgentHelper.
     """
 
-    def __init__(self, name, ct, agent_helper, num_agents, **kwargs):
+    def __init__(self, name, ct, agent_helper, **kwargs):
         self.name = name
         self.ct = ct
-        self.num_agents = num_agents
         self.helper_creator = (lambda comm: agent_helper(name, comm, **kwargs))
         self.comm = CTCommunicator()
         self.comms = {}
@@ -91,8 +90,11 @@ class ComputationDataProcessor(object):
         agent_ids = []
         data = []
         while not self.exit_flag:
+            num_agents = sum([r.value for r in self.agent_runnings])
+            if num_agents == 0:
+                return
             try:
-                while len(agent_ids) < self.num_agents:
+                while len(agent_ids) < num_agents:
                     agent_id, d = self.comm.get_prediction_data()
                     agent_ids.append(agent_id)
                     data.append(d)
@@ -113,8 +115,11 @@ class ComputationDataProcessor(object):
         agent_ids = []
         data = []
         while not self.exit_flag:
+            num_agents = sum([r.value for r in self.agent_runnings])
+            if num_agents == 0:
+                return
             try:
-                while len(agent_ids) < self.num_agents:
+                while len(agent_ids) < num_agents:
                     agent_id, d = self.comm.get_training_data()
                     agent_ids.append(agent_id)
                     data.append(d)
@@ -129,8 +134,9 @@ class ComputationDataProcessor(object):
             agent_ids = []
             data = []
 
-    def run(self):
+    def run(self, agent_runnings):
         self.exit_flag = False
+        self.agent_runnings = agent_runnings
         self.prediction_thread.start()
         self.training_thread.start()
 
