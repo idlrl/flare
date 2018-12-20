@@ -5,6 +5,7 @@ from flare.common.log import GameLogger
 import signal
 import time
 import sys
+import os
 
 
 class Manager(object):
@@ -86,8 +87,6 @@ class Manager(object):
     def start(self):
         signal.signal(signal.SIGINT, self.__signal_handler)
         self.logger.start()
-        for cdp in self.CDPs.values():
-            cdp.run()
         for agent in self.agents:
             agent.start()
 
@@ -96,19 +95,8 @@ class Manager(object):
             if all([a.running.value for a in self.agents]):
                 break
 
-        while True:
-            # keep querying agents' progress
-            # whichever agent ends first, we end all
-            end_flag = False
-            for a in self.agents:
-                if not a.running.value:
-                    end_flag = True
-            if end_flag:
-                for a in self.agents:
-                    a.terminate()
-                break
-            else:
-                time.sleep(1.0)
+        for cdp in self.CDPs.values():
+            cdp.run([a.running for a in self.agents])
 
         while self.agents:
             self.agents[-1].join()
@@ -118,15 +106,6 @@ class Manager(object):
             cdp.stop()
 
         # Retrieve all the stats from the logger
-        self.stats = []
-        while not self.logger.stats_q.empty():
-            self.stats.append(self.logger.stats_q.get())
         self.logger.running.value = False
+        self.stats = self.logger.stats_q.get()
         self.logger.join()
-
-    def get_last_stats(self):
-        """
-        Return the latest logger stats. This may be useful if
-        we want to return the performance after the training ends.
-        """
-        return self.stats[-1]
