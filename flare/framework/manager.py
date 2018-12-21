@@ -107,5 +107,11 @@ class Manager(object):
 
         # Retrieve all the stats from the logger
         self.logger.running.value = False
-        self.stats = self.logger.stats_q.get()
+        self.stats = []
+        # wait for all the logs to be flushed
+        while not self.logger.all_flushed.value:
+            pass
+        while not self.logger.stats_q.empty():
+            self.stats.append(self.logger.stats_q.get())
+        self.logger.terminate()
         self.logger.join()
