@@ -15,10 +15,10 @@ if __name__ == '__main__':
     """
     game = "Assault-v0"
 
-    num_agents = 16
-    num_games = 8000
+    num_agents = 64
+    num_games = 500
 
-    im_height, im_width = 84, 84
+    im_height, im_width = 105, 80
     env_class = GymEnvImage
     env_args = dict(
         game_name=game,
@@ -45,23 +45,28 @@ if __name__ == '__main__':
     #    Here we use a small CNN as the perception net for the Actor-Critic algorithm
     cnn = nn.Sequential(
         nn.Conv2d(
-            d, 32, kernel_size=8, stride=4),
+            d, 32, kernel_size=5, padding=2),
         nn.ReLU(),
+        nn.MaxPool2d(2, 2),
         nn.Conv2d(
-            32, 64, kernel_size=4, stride=2),
+            32, 32, kernel_size=5, padding=2),
         nn.ReLU(),
+        nn.MaxPool2d(2, 2),
         nn.Conv2d(
-            64, 64, kernel_size=3, stride=1),
+            32, 64, kernel_size=3, padding=1),
         nn.ReLU(),
+        nn.MaxPool2d(2, 2),
+        nn.Conv2d(64, 64, kernel_size=3, padding=1),
+        nn.ReLU(),
+        nn.MaxPool2d(2, 2),
         Flatten(),  # flatten the CNN cube to a vector
-        nn.Linear(7 * 7 * 64, 512),
+        nn.Linear(1920, 512),
         nn.ReLU())
 
     alg = SimpleAC(
         model=SimpleModelAC(
             dims=(d, h, w), num_actions=num_actions, perception_net=cnn),
         optim=(optim.RMSprop, dict(lr=1e-4)),
-        grad_clip=5.0,
         gpu_id=1)
 
     # 3. Specify the settings for learning: data sampling strategy
@@ -73,7 +78,7 @@ if __name__ == '__main__':
             # sampling
             agent_helper=OnlineHelper,
             # each agent will call `learn()` every `sample_interval` steps
-            sample_interval=5,
+            sample_interval=2,
             num_agents=num_agents)
     }
 

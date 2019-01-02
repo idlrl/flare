@@ -88,7 +88,6 @@ class GameLogger(Process):
     def __flush_log(self):
         for alg_name, stats in self.stats.items():
             logging.info('\n{0}:{1}'.format(alg_name, stats))
-        self.stats_q.put(copy.deepcopy(self.stats))
 
     def __save_models(self, idx):
         ## When agent.learning=False, this will not save models
@@ -119,7 +118,4 @@ class GameLogger(Process):
                 continue
             self.__process_log(log)
         self.__flush_log()
-        self.all_flushed.value = True
-        # wait for stats_q to be emptied by the manager
-        while not self.stats_q.empty():
-            pass
+        self.stats_q.put(copy.deepcopy(self.stats))
