@@ -19,6 +19,7 @@ class AgentHelper(object):
         self.name = name
         self.comm = communicator
         self.counter = 0
+        assert sample_interval >= 2
         self.sample_interval = sample_interval
 
     def unpack_exps(self, exp_seqs):
