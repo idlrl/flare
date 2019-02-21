@@ -1,5 +1,5 @@
 from flare.framework import common_functions as comf
-from simple_algorithms import SimpleQ
+from flare.algorithm_zoo.simple_algorithms import SimpleQ
 import torch
 import torch.optim as optim
 

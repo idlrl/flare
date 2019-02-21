@@ -159,8 +159,8 @@ def recurrent_group(seq_inputs,
     ]
 
     ## we have to recover the order of sequences using `sorted_idx`
-    reverse_idx = zip(*sorted(
-        list(enumerate(sorted_idx)), key=lambda p: p[1]))[0]
+    reverse_idx = list(zip(*sorted(
+        list(enumerate(sorted_idx)), key=lambda p: p[1])))[0]
     seq_outs = [[out[i] for i in reverse_idx] for out in seq_outs]
 
     return seq_outs

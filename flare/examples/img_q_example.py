@@ -69,7 +69,6 @@ if __name__ == '__main__':
     # ComputationTask.
     ct_settings = {
         "RL": dict(
-            num_agents=num_agents,
             alg=alg,
             # sampling
             agent_helper=ExpReplayHelper,

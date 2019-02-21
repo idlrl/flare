@@ -78,8 +78,7 @@ if __name__ == '__main__':
             # sampling
             agent_helper=OnlineHelper,
             # each agent will call `learn()` every `sample_interval` steps
-            sample_interval=2,
-            num_agents=num_agents)
+            sample_interval=2)
     }
 
     # 4. Create Manager that handles the running of the whole pipeline

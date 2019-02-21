@@ -52,8 +52,7 @@ if __name__ == '__main__':
             alg=alg,
             # sampling
             agent_helper=OnlineHelper,
-            sample_interval=8,
-            num_agents=num_agents)
+            sample_interval=8)
     }
 
     # 4. Create Manager that handles the running of the whole pipeline

@@ -78,7 +78,6 @@ if __name__ == '__main__':
     # settings used by ComputationTask.
     ct_settings = {
         "RL": dict(
-            num_agents=num_agents,
             alg=alg,
             show_para_every_backwards=500,
             # sampling
