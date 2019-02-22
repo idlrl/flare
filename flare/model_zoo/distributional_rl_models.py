@@ -1,4 +1,4 @@
-from simple_models import SimpleModelQ
+from flare.model_zoo.simple_models import SimpleModelQ
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -23,13 +23,13 @@ class C51Model(SimpleModelQ):
         self.bins = bins
 
         self.delta_z = float(self.vmax - self.vmin) / (self.bins - 1)
-        atoms = [vmin + i * self.delta_z for i in xrange(self.bins)]
+        atoms = [vmin + i * self.delta_z for i in range(self.bins)]
         atoms = torch.tensor(atoms, requires_grad=False)
         ## atoms are constent, so register as buffer.
         self.register_buffer("atoms", atoms)
 
     def value(self, inputs, states):
-        q_distributions = self.value_net(inputs.values()[0])
+        q_distributions = self.value_net(inputs["sensor"])
         q_distributions = q_distributions.view(-1, self.num_actions, self.bins)
         q_distributions = F.softmax(q_distributions, 2)
         q_values = torch.matmul(q_distributions, self.atoms)
@@ -43,13 +43,13 @@ class QRDQNModel(SimpleModelQ):
         super(QRDQNModel, self).__init__(dims, num_actions * N, perception_net)
         self.num_actions = num_actions
         tau_hat = torch.tensor(
-            [(2 * i + 1.) / (2 * N) for i in xrange(N)],
+            [(2 * i + 1.) / (2 * N) for i in range(N)],
             requires_grad=False).view(1, -1)
         self.register_buffer("tau_hat", tau_hat)
         self.N = N
 
     def value(self, inputs, states):
-        q_quantiles = self.value_net(inputs.values()[0])
+        q_quantiles = self.value_net(inputs["sensor"])
         q_quantiles = q_quantiles.view(-1, self.num_actions, self.N)
         q_values = q_quantiles.mean(-1)
         return dict(
@@ -73,7 +73,7 @@ class IQNModel(SimpleModelQ):
         self.num_actions = num_actions
         self.inner_size = inner_size
         pi_base = torch.tensor(
-            [math.pi * i for i in xrange(n)], requires_grad=False).view(1, -1)
+            [math.pi * i for i in range(n)], requires_grad=False).view(1, -1)
         self.register_buffer("pi_base", pi_base)
         phi_mlp = nn.Sequential(nn.Linear(n, self.inner_size), nn.ReLU())
         self.add_module("phi_mlp", phi_mlp)

@@ -24,7 +24,6 @@ def c51(cnn, dims, num_actions, num_agents):
 
     ct_settings = {
         "RL": dict(
-            num_agents=num_agents,
             alg=alg,
             # sampling
             agent_helper=ExpReplayHelper,
@@ -47,7 +46,6 @@ def rqdqn(cnn, dims, num_actions, num_agents):
 
     ct_settings = {
         "RL": dict(
-            num_agents=num_agents,
             alg=alg,
             # sampling
             agent_helper=ExpReplayHelper,
@@ -69,7 +67,6 @@ def iqn(cnn, dims, num_actions, num_agents):
 
     ct_settings = {
         "RL": dict(
-            num_agents=num_agents,
             alg=alg,
             # sampling
             agent_helper=ExpReplayHelper,
