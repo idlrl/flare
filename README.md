@@ -107,8 +107,7 @@ ct_settings = {
         # sampling
         agent_helper=OnlineHelper,   ## the training data collection is online
         # each agent will call `learn()` every `sample_interval` steps
-        sample_interval=4,
-        num_agents=num_agents)
+        sample_interval=4)
 }
 ```
 
