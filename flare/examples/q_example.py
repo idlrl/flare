@@ -38,12 +38,12 @@ if __name__ == '__main__':
         nn.Linear(state_shape[0], inner_size),
         nn.ReLU(),
         nn.Linear(inner_size, inner_size),
-        nn.ReLU(), nn.Linear(inner_size, inner_size), nn.ReLU())
+        nn.ReLU())
 
     alg = SimpleQ(
         model=SimpleModelQ(
             dims=state_shape, num_actions=num_actions, perception_net=mlp),
-        exploration_end_steps=500000 // num_agents,
+        exploration_end_steps=1000000 // num_agents,
         update_ref_interval=100)
 
     # 3. Specify the settings for learning: the algorithm to use (SimpleAC
@@ -54,10 +54,10 @@ if __name__ == '__main__':
             alg=alg,
             # sampling
             agent_helper=ExpReplayHelper,
-            buffer_capacity=200000 // num_agents,
+            buffer_capacity=1000000 // num_agents,
             num_experiences=4,  # num per agent
             num_seqs=0,  # sample instances
-            sample_interval=8)
+            sample_interval=2)
     }
 
     # 4. Create Manager that handles the running of the whole pipeline
