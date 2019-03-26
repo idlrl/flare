@@ -4,6 +4,7 @@ import numpy as np
 from torch.distributions import Categorical
 import torch
 import torch.optim as optim
+from torch.optim import Optimizer
 from flare.framework.algorithm import Algorithm
 from flare.framework import common_functions as comf
 import flare.framework.recurrent as rc
@@ -18,7 +19,12 @@ class SimpleAlgorithm(Algorithm):
     def __init__(self, model, gpu_id, discount_factor, optim, grad_clip, ntd):
         super(SimpleAlgorithm, self).__init__(model, gpu_id)
         self.discount_factor = discount_factor
-        self.optim = optim[0](self.model.parameters(), **optim[1])
+        if isinstance(optim, tuple):
+            self.optim = optim[0](self.model.parameters(), **optim[1])
+        elif isinstance(optim, Optimizer):
+            self.optim = optim
+        else:
+            assert False, "Incorrect optim type"
         self.ntd = ntd
         self.grad_clip = grad_clip
         self.recurrent_helper = rc.AgentRecurrentHelper()
