@@ -61,6 +61,8 @@ class SuccessorRepresentationQ(SimpleQ):
                                           BxAxD where B is the batch size, A is the number of
                                           actions, and D is the dim of state embedding
         """
+        self.model.train()
+
         action = actions["action"]
         next_action = next_actions["action"]
         reward = rewards["reward"]

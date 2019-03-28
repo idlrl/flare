@@ -141,10 +141,12 @@ class DDPG(Algorithm):
         """
         Override the base predict() function to put the exploration rate in inputs
         """
+        self.model.eval()
         return self.model.policy(inputs, states)
 
     def learn(self, inputs, next_inputs, states, next_states, next_alive,
               actions, next_actions, rewards):
+        self.model.train()
 
         if self.update_ref_interval and self.total_batches % self.update_ref_interval == 0:
             ## copy parameters from self.model to self.ref_model
