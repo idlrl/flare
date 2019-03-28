@@ -31,6 +31,7 @@ class SimpleAlgorithm(Algorithm):
 
     def learn(self, inputs, next_inputs, states, next_states, next_alive,
               actions, next_actions, rewards):
+        self.model.train()
         self.optim.zero_grad()
         if states:
             ## next_values will preserve the sequential information!
@@ -66,6 +67,7 @@ class SimpleAlgorithm(Algorithm):
         return costs
 
     def predict(self, inputs, states):
+        self.model.eval()
         return self._rl_predict(self.model, inputs, states)
 
     @abstractmethod
@@ -194,6 +196,7 @@ class SimpleQ(SimpleAlgorithm):
         """
         Override the base predict() function to put the exploration rate in inputs
         """
+        self.model.eval()
         distributions, states = self.model.policy(inputs, states)
         actions = {}
         for key, dist in distributions.items():

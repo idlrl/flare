@@ -3,9 +3,11 @@ import torch.nn as nn
 from flare.algorithm_zoo.simple_algorithms import SimpleQ
 from flare.framework.manager import Manager
 from flare.model_zoo.simple_models import SimpleModelQ
+from flare.framework.common_functions import rl_safe_batchnorm
 from flare.framework.agent import ExpReplayHelper
 from flare.env_zoo.gym_env import GymEnv
 from flare.agent_zoo.simple_rl_agents import SimpleRLAgent
+import torch.optim as optim
 
 
 if __name__ == '__main__':
@@ -14,8 +16,8 @@ if __name__ == '__main__':
     """
     game = "MountainCar-v0"
 
-    num_agents = 16
-    num_games = 8000
+    num_agents = 32
+    num_games = 1000
 
     env = GymEnv(game)
     state_shape = env.observation_dims()["sensor"]
@@ -24,7 +26,7 @@ if __name__ == '__main__':
     # 1. Spawn one agent for each instance of environment.
     #    Agent's behavior depends on the actual algorithm being used. Since we
     #    are using SimpleAC, a proper type of Agent is SimpleRLAgent.
-    reward_shaping_f = lambda x: x / 100.0
+    reward_shaping_f = lambda x: x / 100
     agents = []
     for _ in range(num_agents):
         agent = SimpleRLAgent(num_games, reward_shaping_f=reward_shaping_f)
@@ -34,8 +36,13 @@ if __name__ == '__main__':
     # 2. Construct the network and specify the algorithm.
     #    Here we use a small MLP and apply the Q-learning algorithm
     inner_size = 256
+    bn = rl_safe_batchnorm(nn.BatchNorm1d)
     mlp = nn.Sequential(
         nn.Linear(state_shape[0], inner_size),
+        bn(inner_size),
+        nn.ReLU(),
+        nn.Linear(inner_size, inner_size),
+        bn(inner_size),
         nn.ReLU(),
         nn.Linear(inner_size, inner_size),
         nn.ReLU())
@@ -43,7 +50,8 @@ if __name__ == '__main__':
     alg = SimpleQ(
         model=SimpleModelQ(
             dims=state_shape, num_actions=num_actions, perception_net=mlp),
-        exploration_end_steps=1000000 // num_agents,
+        exploration_end_steps=500000 // num_agents,
+        optim=(optim.RMSprop, dict(lr=1e-4)),
         update_ref_interval=100)
 
     # 3. Specify the settings for learning: the algorithm to use (SimpleAC
@@ -54,8 +62,8 @@ if __name__ == '__main__':
             alg=alg,
             # sampling
             agent_helper=ExpReplayHelper,
-            buffer_capacity=1000000 // num_agents,
-            num_experiences=4,  # num per agent
+            buffer_capacity=500000 // num_agents,
+            num_experiences=2,  # num per agent
             num_seqs=0,  # sample instances
             sample_interval=2)
     }

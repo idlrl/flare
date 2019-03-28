@@ -185,3 +185,26 @@ def prepare_ntd_value(value, discount_factor):
             v[i] = discount_factor * v[i + 1]
         ntd_value.append(v)
     return ntd_value
+
+
+def rl_safe_batchnorm(bn_cls):
+    assert bn_cls == nn.BatchNorm1d \
+        or bn_cls == nn.BatchNorm2d \
+        or bn_cls == nn.BatchNorm3d
+
+    class safeBatchNorm(bn_cls):
+        """
+        Reason for this customized batchnorm layer is that nn.BatchNorm
+        requires the batch size > 1. Towards the end of training we might
+        only have just one training sample from a single agent each time.
+        """
+        def __init__(self, dim):
+            super().__init__(dim)
+
+        def forward(self, x):
+            # batch size might be 1 (one agent) towards training end
+            if x.size()[0] == 1:
+                return x
+            return super().forward(x)
+
+    return safeBatchNorm
