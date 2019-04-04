@@ -169,9 +169,11 @@ class GaussianPolicyModel(Model):
         return [("action", dict(shape=[self.action_dims]))]
 
     def policy(self, inputs, states):
+        x = list(inputs.values())[0]
+        identity = torch.eye(self.action_dims).to(x.device)
         dist = MultivariateNormal(
-            loc=self.policy_net(list(inputs.values())[0]),
-            covariance_matrix=torch.eye(self.action_dims) * self.std)
+            loc=self.policy_net(x),
+            covariance_matrix=identity * self.std)
         return dict(action=dist), states
 
     def value(self, inputs, states):
