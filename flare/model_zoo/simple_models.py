@@ -150,17 +150,17 @@ class SimpleRNNModelQ(Model):
 
 
 class GaussianPolicyModel(Model):
-    def __init__(self, dims, action_dims, perception_net, std=0.01):
+    def __init__(self, dims, action_dims, perception_net):
         super(GaussianPolicyModel, self).__init__()
         assert isinstance(dims, list) or isinstance(dims, tuple)
         self.dims = dims
         self.action_dims = action_dims
-        self.std = std
         hidden_size = list(perception_net.modules())[-2].out_features
         self.policy_net = nn.Sequential(perception_net,
                                         nn.Linear(hidden_size, action_dims))
         self.value_net = nn.Sequential(perception_net,
                                        nn.Linear(hidden_size, 1))
+        self.std = nn.Parameter(torch.zeros(action_dims))
 
     def get_input_specs(self):
         return [("sensor", dict(shape=self.dims))]
@@ -169,11 +169,9 @@ class GaussianPolicyModel(Model):
         return [("action", dict(shape=[self.action_dims]))]
 
     def policy(self, inputs, states):
-        x = list(inputs.values())[0]
-        identity = torch.eye(self.action_dims).to(x.device)
         dist = MultivariateNormal(
-            loc=self.policy_net(x),
-            covariance_matrix=identity * self.std)
+            loc=self.policy_net(list(inputs.values())[0]),
+            covariance_matrix=torch.diag(torch.sigmoid(self.std)))
         return dict(action=dist), states
 
     def value(self, inputs, states):

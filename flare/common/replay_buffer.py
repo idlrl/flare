@@ -85,7 +85,7 @@ class ReplayBuffer(object):
         If num_seqs == 0, generate a batch of individual experiences.
         """
         exp_seqs = []
-        if len(self.buffer) <= 1000:
+        if len(self.buffer) <= self.capacity // 10:
             return exp_seqs
 
         if num_seqs == 0:
