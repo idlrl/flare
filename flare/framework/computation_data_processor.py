@@ -95,7 +95,7 @@ class ComputationDataProcessor(object):
             num_agents = sum([r.value for r in self.agent_runnings])
             if num_agents == 0:
                 return
-            any_agent_finished = (num_agents < self.init_agents_n)
+            any_agent_finished = (num_agents < len(self.agent_runnings))
             try:
                 while len(agent_ids) < min(num_agents, self.agents_per_batch):
                     agent_id, d = self.comm.get_prediction_data()
@@ -143,7 +143,6 @@ class ComputationDataProcessor(object):
     def run(self, agent_runnings):
         self.exit_flag = False
         self.agent_runnings = agent_runnings
-        self.init_agents_n = len(agent_runnings)
         self.prediction_thread.start()
         self.training_thread.start()
 
