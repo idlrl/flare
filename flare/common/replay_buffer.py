@@ -141,4 +141,5 @@ class NoReplacementQueue(object):
                 exp_seqs.append(exps)
             if self.q[0].is_episode_end():
                 self.q.popleft()
+        assert exp_seqs
         return exp_seqs

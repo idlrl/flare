@@ -95,6 +95,12 @@ class GymEnv(Env):
             return {self.action_key: act_space.n}
         return {self.action_key: act_space.shape[0]}
 
+    def action_range(self):
+        act_space = self.gym_env.action_space
+        if isinstance(act_space, gym.spaces.Discrete):
+            return {self.action_key: range(act_space.n)}
+        return {self.action_key: [act_space.low, act_space.high]}
+
 
 class GymEnvImage(GymEnv):
     """

@@ -3,6 +3,7 @@ from queue import Empty, Full
 from threading import Thread, Lock
 from flare.common.communicator import CTCommunicator, AgentCommunicator
 from flare.common.utils import concat_dicts, split_dict
+import sys
 
 
 class ComputationDataProcessor(object):
@@ -12,9 +13,10 @@ class ComputationDataProcessor(object):
     splits the batched results and sends them back to AgentHelper.
     """
 
-    def __init__(self, name, ct, agent_helper, **kwargs):
+    def __init__(self, name, ct, agent_helper, agents_per_batch=sys.maxsize, **kwargs):
         self.name = name
         self.ct = ct
+        self.agents_per_batch = agents_per_batch
         self.helper_creator = (lambda comm: agent_helper(name, comm, **kwargs))
         self.comm = CTCommunicator()
         self.comms = {}
@@ -93,13 +95,16 @@ class ComputationDataProcessor(object):
             num_agents = sum([r.value for r in self.agent_runnings])
             if num_agents == 0:
                 return
+            any_agent_finished = (num_agents < self.init_agents_n)
             try:
-                while len(agent_ids) < num_agents:
+                while len(agent_ids) < min(num_agents, self.agents_per_batch):
                     agent_id, d = self.comm.get_prediction_data()
                     agent_ids.append(agent_id)
                     data.append(d)
             except Empty as e:
-                continue
+                if not any_agent_finished or len(agent_ids) == 0:
+                    continue
+            assert agent_ids
             ret = self.do_one_prediction(data)
             assert len(ret) == len(agent_ids)
             try:
@@ -107,7 +112,7 @@ class ComputationDataProcessor(object):
                     self.comm.prediction_return(ret[i],
                                                 self.comms[agent_ids[i]])
             except Full:
-                pass
+                assert False, 'full'
             agent_ids = []
             data = []
 
@@ -119,24 +124,26 @@ class ComputationDataProcessor(object):
             if num_agents == 0:
                 return
             try:
-                while len(agent_ids) < num_agents:
+                while len(agent_ids) < min(num_agents, self.agents_per_batch):
                     agent_id, d = self.comm.get_training_data()
                     agent_ids.append(agent_id)
                     data.append(d)
             except Empty as e:
                 continue
+            assert agent_ids
             ret = self.do_one_training(data)
             try:
                 for i in range(len(agent_ids)):
                     self.comm.training_return(ret[i], self.comms[agent_ids[i]])
             except Full as e:
-                pass
+                assert False, 'full'
             agent_ids = []
             data = []
 
     def run(self, agent_runnings):
         self.exit_flag = False
         self.agent_runnings = agent_runnings
+        self.init_agents_n = len(agent_runnings)
         self.prediction_thread.start()
         self.training_thread.start()
 
